@@ -59,9 +59,10 @@ static void hid_reader_scene_startscreen_output_and_reset(HidReader* app) {
     FURI_LOG_I("HidReaderScene", "output_and_reset: nfc_uid_len=%d, rfid_uid_len=%d", app->nfc_uid_len, app->rfid_uid_len);
 
     // Format the output
-    bool nfc_first = (app->mode == HidReaderModeNfc ||
-                      app->mode == HidReaderModeNfcThenRfid ||
-                      app->mode == HidReaderModeScanOrder);
+    // In "Any" mode, nfc_first doesn't matter since only one tag is scanned
+    bool nfc_first = (app->mode == HidReaderModeAny ||
+                      app->mode == HidReaderModeNfc ||
+                      app->mode == HidReaderModeNfcThenRfid);
 
     hid_reader_format_output(
         app->nfc_uid_len > 0 ? app->nfc_uid : NULL,
@@ -137,6 +138,14 @@ static void hid_reader_scene_startscreen_start_scanning(HidReader* app) {
 
     // Start appropriate reader(s) based on mode
     switch(app->mode) {
+    case HidReaderModeAny:
+        // Start both NFC and RFID - first detected wins
+        // NFC (13.56 MHz) and RFID (125 kHz) use different hardware, so they can run simultaneously
+        hid_reader_nfc_set_callback(app->nfc, hid_reader_scene_startscreen_nfc_callback, app);
+        hid_reader_nfc_start(app->nfc, app->ndef_enabled);
+        hid_reader_rfid_set_callback(app->rfid, hid_reader_scene_startscreen_rfid_callback, app);
+        hid_reader_rfid_start(app->rfid);
+        break;
     case HidReaderModeNfc:
         hid_reader_nfc_set_callback(app->nfc, hid_reader_scene_startscreen_nfc_callback, app);
         hid_reader_nfc_start(app->nfc, app->ndef_enabled);
@@ -154,13 +163,6 @@ static void hid_reader_scene_startscreen_start_scanning(HidReader* app) {
         // Start with RFID
         hid_reader_rfid_set_callback(app->rfid, hid_reader_scene_startscreen_rfid_callback, app);
         hid_reader_rfid_start(app->rfid);
-        break;
-    case HidReaderModeScanOrder:
-        // Start both (NFC has priority since it's checked first)
-        hid_reader_nfc_set_callback(app->nfc, hid_reader_scene_startscreen_nfc_callback, app);
-        hid_reader_nfc_start(app->nfc, app->ndef_enabled);
-        // Note: Can't run both simultaneously due to hardware limitation
-        // For now, just use NFC in this mode
         break;
     default:
         break;
@@ -218,9 +220,9 @@ bool hid_reader_scene_startscreen_on_event(void* context, SceneManagerEvent even
         case HidReaderCustomEventNfcDetected:
             // NFC tag detected
             FURI_LOG_I("HidReaderScene", "Event NfcDetected: mode=%d, scan_state=%d", app->mode, app->scan_state);
-            if(app->mode == HidReaderModeNfc || app->mode == HidReaderModeScanOrder) {
+            if(app->mode == HidReaderModeNfc || app->mode == HidReaderModeAny) {
                 // Single tag mode - output immediately
-                FURI_LOG_D("HidReaderScene", "NFC single mode - stopping and outputting");
+                FURI_LOG_D("HidReaderScene", "NFC single/any mode - stopping and outputting");
                 hid_reader_scene_startscreen_stop_scanning(app);
                 hid_reader_scene_startscreen_output_and_reset(app);
             } else if(app->mode == HidReaderModeNfcThenRfid) {
@@ -245,8 +247,10 @@ bool hid_reader_scene_startscreen_on_event(void* context, SceneManagerEvent even
 
         case HidReaderCustomEventRfidDetected:
             // RFID tag detected
-            if(app->mode == HidReaderModeRfid) {
+            FURI_LOG_I("HidReaderScene", "Event RfidDetected: mode=%d, scan_state=%d", app->mode, app->scan_state);
+            if(app->mode == HidReaderModeRfid || app->mode == HidReaderModeAny) {
                 // Single tag mode - output immediately
+                FURI_LOG_D("HidReaderScene", "RFID single/any mode - stopping and outputting");
                 hid_reader_scene_startscreen_stop_scanning(app);
                 hid_reader_scene_startscreen_output_and_reset(app);
             } else if(app->mode == HidReaderModeRfidThenNfc) {

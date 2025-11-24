@@ -48,7 +48,7 @@ HidReader* hid_reader_app_alloc() {
     app->bt_enabled = true;
 
     // Scanning defaults
-    app->mode = HidReaderModeNfcThenRfid;  // Default: NFC -> RFID
+    app->mode = HidReaderModeAny;  // Default: Any tag (NFC or RFID)
     app->scan_state = HidReaderScanStateIdle;
     app->delimiter[0] = '\0';  // Empty delimiter by default
     app->append_enter = true;

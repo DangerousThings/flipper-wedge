@@ -7,11 +7,11 @@
 #define MODE_COUNT 6
 
 static const char* mode_names[] = {
+    "Any",
     "NFC",
     "RFID",
     "NFC -> RFID",
     "RFID -> NFC",
-    "Scan Order",
     "Pair Bluetooth",
 };
 
@@ -109,7 +109,7 @@ void hid_reader_startscreen_draw(Canvas* canvas, HidReaderStartscreenModel* mode
 static void hid_reader_startscreen_model_init(HidReaderStartscreenModel* const model) {
     model->usb_connected = false;
     model->bt_connected = false;
-    model->mode = HidReaderModeNfcThenRfid;
+    model->mode = HidReaderModeAny;
     model->display_state = HidReaderDisplayStateIdle;
     model->status_text[0] = '\0';
     model->uid_text[0] = '\0';
