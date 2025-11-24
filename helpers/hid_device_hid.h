@@ -39,6 +39,18 @@ void hid_device_hid_start(HidDeviceHid* instance, bool enable_usb, bool enable_b
  */
 void hid_device_hid_stop(HidDeviceHid* instance);
 
+/** Start only Bluetooth HID (for dynamic enable)
+ *
+ * @param instance HidDeviceHid instance
+ */
+void hid_device_hid_start_bt(HidDeviceHid* instance);
+
+/** Stop only Bluetooth HID (for dynamic disable)
+ *
+ * @param instance HidDeviceHid instance
+ */
+void hid_device_hid_stop_bt(HidDeviceHid* instance);
+
 /** Set connection status callback
  *
  * @param instance HidDeviceHid instance

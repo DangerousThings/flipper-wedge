@@ -5,7 +5,6 @@ typedef enum {
     HidDeviceCustomEventStartscreenDown,
     HidDeviceCustomEventStartscreenLeft,
     HidDeviceCustomEventStartscreenRight,
-    HidDeviceCustomEventStartscreenOk,
     HidDeviceCustomEventStartscreenBack,
     HidDeviceCustomEventTestType,
 

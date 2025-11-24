@@ -14,6 +14,7 @@
 #include <gui/modules/button_menu.h>
 #include <gui/modules/number_input.h>
 #include <gui/modules/text_input.h>
+#include <gui/modules/widget.h>
 #include "scenes/hid_device_scene.h"
 #include "views/hid_device_startscreen.h"
 #include "helpers/hid_device_storage.h"
@@ -38,7 +39,6 @@ typedef enum {
     HidDeviceModeNdef,          // NDEF only (text records)
     HidDeviceModeNfcThenRfid,   // NFC -> RFID combo
     HidDeviceModeRfidThenNfc,   // RFID -> NFC combo
-    HidDeviceModePairBluetooth, // Pair BT HID
     HidDeviceModeCount,
 } HidDeviceMode;
 
@@ -106,4 +106,5 @@ typedef enum {
     HidDeviceViewIdTextInput,
     HidDeviceViewIdNumberInput,
     HidDeviceViewIdSettings,
+    HidDeviceViewIdBtPair,
 } HidDeviceViewId;

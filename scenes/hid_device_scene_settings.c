@@ -4,6 +4,8 @@
 enum SettingsIndex {
     SettingsIndexDelimiter,
     SettingsIndexAppendEnter,
+    SettingsIndexBtEnable,
+    SettingsIndexBtPair,
 };
 
 const char* const on_off_text[2] = {
@@ -67,6 +69,30 @@ static void hid_device_scene_settings_set_append_enter(VariableItem* item) {
     app->append_enter = (index == 1);
 }
 
+static void hid_device_scene_settings_set_bt_enable(VariableItem* item) {
+    HidDevice* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+
+    variable_item_set_current_value_text(item, on_off_text[index]);
+    bool new_bt_enabled = (index == 1);
+
+    // Handle BT enable/disable
+    if(new_bt_enabled != app->bt_enabled) {
+        app->bt_enabled = new_bt_enabled;
+
+        if(app->bt_enabled) {
+            // Enable BT - start HID
+            hid_device_hid_start_bt(app->hid);
+        } else {
+            // Disable BT - stop HID
+            hid_device_hid_stop_bt(app->hid);
+        }
+
+        // Rebuild settings list to show/hide "Pair Bluetooth..." option
+        scene_manager_handle_custom_event(app->scene_manager, SettingsIndexBtEnable);
+    }
+}
+
 static void hid_device_scene_settings_item_callback(void* context, uint32_t index) {
     HidDevice* app = context;
     view_dispatcher_send_custom_event(app->view_dispatcher, index);
@@ -97,6 +123,31 @@ void hid_device_scene_settings_on_enter(void* context) {
     variable_item_set_current_value_index(item, app->append_enter ? 1 : 0);
     variable_item_set_current_value_text(item, on_off_text[app->append_enter ? 1 : 0]);
 
+    // Enable Bluetooth HID toggle
+    item = variable_item_list_add(
+        app->variable_item_list,
+        "Bluetooth HID:",
+        2,
+        hid_device_scene_settings_set_bt_enable,
+        app);
+    variable_item_set_current_value_index(item, app->bt_enabled ? 1 : 0);
+    variable_item_set_current_value_text(item, on_off_text[app->bt_enabled ? 1 : 0]);
+
+    // Pair Bluetooth... action (only if BT is enabled)
+    if(app->bt_enabled) {
+        // Get BT connection status to show in label
+        bool bt_connected = hid_device_hid_is_bt_connected(app->hid);
+        const char* bt_status = bt_connected ? "Connected" : "Not paired";
+
+        item = variable_item_list_add(
+            app->variable_item_list,
+            "Pair Bluetooth...",
+            1,
+            NULL,  // No change callback
+            app);
+        variable_item_set_current_value_text(item, bt_status);
+    }
+
     // Set callback for when user clicks on an item
     variable_item_list_set_enter_callback(
         app->variable_item_list,
@@ -110,7 +161,18 @@ bool hid_device_scene_settings_on_event(void* context, SceneManagerEvent event) 
     HidDevice* app = context;
     bool consumed = false;
 
-    if(event.type == SceneManagerEventTypeBack) {
+    if(event.type == SceneManagerEventTypeCustom) {
+        if(event.event == SettingsIndexBtEnable) {
+            // BT toggle changed - rebuild list to show/hide Pair BT option
+            variable_item_list_reset(app->variable_item_list);
+            hid_device_scene_settings_on_enter(context);
+            consumed = true;
+        } else if(event.event == SettingsIndexBtPair) {
+            // User clicked "Pair Bluetooth..." - navigate to pairing scene
+            scene_manager_next_scene(app->scene_manager, HidDeviceSceneBtPair);
+            consumed = true;
+        }
+    } else if(event.type == SceneManagerEventTypeBack) {
         // Save settings when leaving
         hid_device_save_settings(app);
     }

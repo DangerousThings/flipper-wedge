@@ -136,6 +136,76 @@ void hid_device_hid_stop(HidDeviceHid* instance) {
     FURI_LOG_I(TAG, "HID services stopped");
 }
 
+void hid_device_hid_start_bt(HidDeviceHid* instance) {
+    furi_assert(instance);
+
+    // Don't start if already started
+    if(instance->bt_started) {
+        FURI_LOG_I(TAG, "BT HID already started");
+        return;
+    }
+
+    FURI_LOG_I(TAG, "Starting BT HID");
+    instance->bt = furi_record_open(RECORD_BT);
+
+    // Disconnect from any existing connection before profile switch
+    bt_disconnect(instance->bt);
+    // Wait 200ms for 2nd core to update NVM storage (CRITICAL!)
+    furi_delay_ms(200);
+
+    // Set up key storage
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    storage_common_migrate(
+        storage,
+        EXT_PATH("apps/NFC/" HID_DEVICE_BT_KEYS_STORAGE_NAME),
+        APP_DATA_PATH(HID_DEVICE_BT_KEYS_STORAGE_NAME));
+    bt_keys_storage_set_storage_path(instance->bt, APP_DATA_PATH(HID_DEVICE_BT_KEYS_STORAGE_NAME));
+    furi_record_close(RECORD_STORAGE);
+
+    // Start BLE HID profile
+    instance->ble_hid_profile = bt_profile_start(instance->bt, ble_profile_hid, NULL);
+    furi_check(instance->ble_hid_profile);
+
+    // Start advertising
+    furi_hal_bt_start_advertising();
+
+    // Register connection status callback
+    bt_set_status_changed_callback(instance->bt, hid_device_hid_bt_status_callback, instance);
+
+    instance->bt_started = true;
+    FURI_LOG_I(TAG, "BT HID started");
+}
+
+void hid_device_hid_stop_bt(HidDeviceHid* instance) {
+    furi_assert(instance);
+
+    // Don't stop if not started
+    if(!instance->bt_started || !instance->bt) {
+        FURI_LOG_I(TAG, "BT HID not started, nothing to stop");
+        return;
+    }
+
+    FURI_LOG_I(TAG, "Stopping BT HID");
+    bt_set_status_changed_callback(instance->bt, NULL, NULL);
+    bt_disconnect(instance->bt);
+    furi_delay_ms(200);  // CRITICAL delay for NVM sync
+    bt_keys_storage_set_default_path(instance->bt);
+    furi_check(bt_profile_restore_default(instance->bt));
+    furi_record_close(RECORD_BT);
+    instance->bt = NULL;
+    instance->ble_hid_profile = NULL;
+    instance->bt_started = false;
+    instance->bt_connected = false;
+
+    FURI_LOG_I(TAG, "BT HID stopped");
+
+    // Notify connection callback about BT disconnection
+    if(instance->connection_callback) {
+        bool usb_connected = hid_device_hid_is_usb_connected(instance);
+        instance->connection_callback(usb_connected, false, instance->connection_callback_context);
+    }
+}
+
 void hid_device_hid_set_connection_callback(
     HidDeviceHid* instance,
     HidDeviceHidConnectionCallback callback,

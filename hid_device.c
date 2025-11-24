@@ -55,7 +55,14 @@ HidDevice* hid_device_app_alloc() {
     app->ndef_text[0] = '\0';
     app->output_buffer[0] = '\0';
 
-    // Allocate and start HID module
+    // Used for File Browser
+    app->dialogs = furi_record_open(RECORD_DIALOGS);
+    app->file_path = furi_string_alloc();
+
+    // Load configs BEFORE starting HID (so we respect bt_enabled setting)
+    hid_device_read_settings(app);
+
+    // Allocate and start HID module with loaded settings
     bool usb_hid_enabled = true;  // Enable USB HID
     app->hid = hid_device_hid_alloc();
     hid_device_hid_start(app->hid, usb_hid_enabled, app->bt_enabled);
@@ -69,14 +76,6 @@ HidDevice* hid_device_app_alloc() {
     // Timers will be created as needed
     app->timeout_timer = NULL;
     app->display_timer = NULL;
-
-
-    // Used for File Browser
-    app->dialogs = furi_record_open(RECORD_DIALOGS);
-    app->file_path = furi_string_alloc();
-
-    // Load configs
-    hid_device_read_settings(app);
 
     view_dispatcher_add_view(
         app->view_dispatcher, HidDeviceViewIdMenu, submenu_get_view(app->submenu));

@@ -4,7 +4,7 @@
 #include <input/input.h>
 #include <gui/elements.h>
 
-#define MODE_COUNT 6
+#define MODE_COUNT 5
 
 static const char* mode_names[] = {
     "NFC",
@@ -12,7 +12,6 @@ static const char* mode_names[] = {
     "NDEF",
     "NFC -> RFID",
     "RFID -> NFC",
-    "Pair Bluetooth",
 };
 
 struct HidDeviceStartscreen {
@@ -78,18 +77,14 @@ void hid_device_startscreen_draw(Canvas* canvas, HidDeviceStartscreenModel* mode
 
         // Status and bottom buttons
         canvas_set_font(canvas, FontSecondary);
-        if(connected && model->mode != HidDeviceModePairBluetooth) {
+        if(connected) {
             canvas_draw_str_aligned(canvas, 64, 46, AlignCenter, AlignTop, "Scanning...");
-        } else if(model->mode == HidDeviceModePairBluetooth) {
-            elements_button_center(canvas, "Pair");
         } else {
             canvas_draw_str_aligned(canvas, 64, 46, AlignCenter, AlignTop, "Connect USB or BT");
         }
 
-        // Show Settings hint (except when in Pair BT mode which already shows button)
-        if(model->mode != HidDeviceModePairBluetooth) {
-            canvas_draw_str_aligned(canvas, 64, 56, AlignCenter, AlignTop, "[OK] Settings");
-        }
+        // Show Settings hint
+        canvas_draw_str_aligned(canvas, 64, 56, AlignCenter, AlignTop, "[OK] Settings");
     } else if(model->display_state == HidDeviceDisplayStateScanning) {
         // Scanning state
         canvas_draw_str_aligned(canvas, 64, 28, AlignCenter, AlignTop, "Scanning...");
@@ -161,19 +156,8 @@ bool hid_device_startscreen_input(InputEvent* event, void* context) {
             break;
         case InputKeyOk:
             if(event->type == InputTypeRelease) {
-                with_view_model(
-                    instance->view,
-                    HidDeviceStartscreenModel * model,
-                    {
-                        if(model->mode == HidDeviceModePairBluetooth) {
-                            // Pair Bluetooth mode - trigger pairing
-                            instance->callback(HidDeviceCustomEventStartscreenOk, instance->context);
-                        } else {
-                            // Any other mode - open Settings
-                            instance->callback(HidDeviceCustomEventOpenSettings, instance->context);
-                        }
-                    },
-                    false);
+                // Open Settings
+                instance->callback(HidDeviceCustomEventOpenSettings, instance->context);
             }
             break;
         case InputKeyUp:

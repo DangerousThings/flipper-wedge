@@ -185,13 +185,9 @@ static void hid_device_scene_startscreen_output_and_reset(HidDevice* app) {
 }
 
 static void hid_device_scene_startscreen_start_scanning(HidDevice* app) {
-    // Don't scan if no HID connection or in Bluetooth pairing mode
+    // Don't scan if no HID connection
     if(!hid_device_hid_is_connected(app->hid)) {
         FURI_LOG_D("HidDeviceScene", "start_scanning: no HID connection, skipping");
-        return;
-    }
-    if(app->mode == HidDeviceModePairBluetooth) {
-        FURI_LOG_D("HidDeviceScene", "start_scanning: BT pair mode, skipping");
         return;
     }
 
@@ -408,7 +404,7 @@ bool hid_device_scene_startscreen_on_event(void* context, SceneManagerEvent even
 
         // Check if we should start/stop scanning based on HID connection
         bool connected = hid_device_hid_is_connected(app->hid);
-        if(connected && app->scan_state == HidDeviceScanStateIdle && app->mode != HidDeviceModePairBluetooth) {
+        if(connected && app->scan_state == HidDeviceScanStateIdle) {
             hid_device_scene_startscreen_start_scanning(app);
         } else if(!connected && app->scan_state != HidDeviceScanStateIdle) {
             hid_device_scene_startscreen_stop_scanning(app);
