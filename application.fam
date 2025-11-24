@@ -16,6 +16,6 @@ App(
     fap_libs=["ble_profile"],
     fap_icon="icons/hid_reader_10px.png",
     fap_icon_assets="icons",
-    fap_category="NFC",
+    fap_category="TOOLS",
     fap_version="1.0",
 )

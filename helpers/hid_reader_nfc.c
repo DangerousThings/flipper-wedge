@@ -136,9 +136,11 @@ static void hid_reader_nfc_scanner_callback(NfcScannerEvent event, void* context
         FURI_LOG_I(TAG, "NFC tag detected, protocols: %zu", event.data.protocol_num);
 
         // Find the best protocol to use
+        // For UID reading, we need ISO14443-3A or ISO14443-4A
+        // MIFARE tags (Ultralight, Classic, etc.) are built on ISO14443-3A but may not expose it
         NfcProtocol protocol_to_use = NfcProtocolInvalid;
 
-        // First check for protocols we support
+        // First check for base protocols we can poll directly
         for(size_t i = 0; i < event.data.protocol_num; i++) {
             NfcProtocol p = event.data.protocols[i];
             FURI_LOG_I(TAG, "  Protocol %zu: %d", i, p);
@@ -154,6 +156,25 @@ static void hid_reader_nfc_scanner_callback(NfcScannerEvent event, void* context
             }
         }
 
+        // If we didn't find a base protocol, try to get the parent protocol of higher-level protocols
+        if(protocol_to_use == NfcProtocolInvalid && event.data.protocol_num > 0) {
+            // Check each detected protocol for a parent we can use
+            for(size_t i = 0; i < event.data.protocol_num; i++) {
+                NfcProtocol p = event.data.protocols[i];
+                NfcProtocol parent = nfc_protocol_get_parent(p);
+                FURI_LOG_I(TAG, "  Protocol %d has parent: %d", p, parent);
+
+                if(parent == NfcProtocolIso14443_3a) {
+                    protocol_to_use = parent;
+                    FURI_LOG_I(TAG, "Using parent protocol ISO14443-3A for UID reading");
+                    break;
+                } else if(parent == NfcProtocolIso14443_4a && protocol_to_use == NfcProtocolInvalid) {
+                    protocol_to_use = parent;
+                    FURI_LOG_I(TAG, "Using parent protocol ISO14443-4A for UID reading");
+                }
+            }
+        }
+
         if(protocol_to_use != NfcProtocolInvalid) {
             // Just mark that we detected a tag and store the protocol
             // The main thread will handle the scanner->poller transition
@@ -161,7 +182,7 @@ static void hid_reader_nfc_scanner_callback(NfcScannerEvent event, void* context
             instance->state = HidReaderNfcStateTagDetected;
             FURI_LOG_I(TAG, "Tag detected, protocol %d, waiting for main thread", protocol_to_use);
         } else {
-            FURI_LOG_W(TAG, "No supported protocol found");
+            FURI_LOG_W(TAG, "No supported protocol found - cannot read UID");
         }
     }
 }

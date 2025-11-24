@@ -59,9 +59,7 @@ static void hid_reader_scene_startscreen_output_and_reset(HidReader* app) {
     FURI_LOG_I("HidReaderScene", "output_and_reset: nfc_uid_len=%d, rfid_uid_len=%d", app->nfc_uid_len, app->rfid_uid_len);
 
     // Format the output
-    // In "Any" mode, nfc_first doesn't matter since only one tag is scanned
-    bool nfc_first = (app->mode == HidReaderModeAny ||
-                      app->mode == HidReaderModeNfc ||
+    bool nfc_first = (app->mode == HidReaderModeNfc ||
                       app->mode == HidReaderModeNfcThenRfid);
 
     hid_reader_format_output(
@@ -138,14 +136,6 @@ static void hid_reader_scene_startscreen_start_scanning(HidReader* app) {
 
     // Start appropriate reader(s) based on mode
     switch(app->mode) {
-    case HidReaderModeAny:
-        // Start both NFC and RFID - first detected wins
-        // NFC (13.56 MHz) and RFID (125 kHz) use different hardware, so they can run simultaneously
-        hid_reader_nfc_set_callback(app->nfc, hid_reader_scene_startscreen_nfc_callback, app);
-        hid_reader_nfc_start(app->nfc, app->ndef_enabled);
-        hid_reader_rfid_set_callback(app->rfid, hid_reader_scene_startscreen_rfid_callback, app);
-        hid_reader_rfid_start(app->rfid);
-        break;
     case HidReaderModeNfc:
         hid_reader_nfc_set_callback(app->nfc, hid_reader_scene_startscreen_nfc_callback, app);
         hid_reader_nfc_start(app->nfc, app->ndef_enabled);
@@ -171,6 +161,7 @@ static void hid_reader_scene_startscreen_start_scanning(HidReader* app) {
 
 static void hid_reader_scene_startscreen_stop_scanning(HidReader* app) {
     FURI_LOG_I("HidReaderScene", "stop_scanning: current scan_state=%d", app->scan_state);
+
     hid_reader_nfc_stop(app->nfc);
     hid_reader_rfid_stop(app->rfid);
     app->scan_state = HidReaderScanStateIdle;
@@ -206,13 +197,9 @@ bool hid_reader_scene_startscreen_on_event(void* context, SceneManagerEvent even
             // Stop current scanning and restart with new mode
             hid_reader_scene_startscreen_stop_scanning(app);
 
-            // Get the new mode from the view - we need to sync it
-            // For now, cycle through modes
-            app->mode = (app->mode + 1) % HidReaderModeCount;
-            if(app->mode == HidReaderModePairBluetooth) {
-                // Skip pair mode in the mode cycling
-            }
-            hid_reader_startscreen_set_mode(app->hid_reader_startscreen, app->mode);
+            // Get the new mode from the view (the view already updated it)
+            app->mode = hid_reader_startscreen_get_mode(app->hid_reader_startscreen);
+            FURI_LOG_I("HidReaderScene", "Mode changed to: %d", app->mode);
             hid_reader_scene_startscreen_start_scanning(app);
             consumed = true;
             break;
@@ -220,7 +207,7 @@ bool hid_reader_scene_startscreen_on_event(void* context, SceneManagerEvent even
         case HidReaderCustomEventNfcDetected:
             // NFC tag detected
             FURI_LOG_I("HidReaderScene", "Event NfcDetected: mode=%d, scan_state=%d", app->mode, app->scan_state);
-            if(app->mode == HidReaderModeNfc || app->mode == HidReaderModeAny) {
+            if(app->mode == HidReaderModeNfc) {
                 // Single tag mode - output immediately
                 FURI_LOG_D("HidReaderScene", "NFC single/any mode - stopping and outputting");
                 hid_reader_scene_startscreen_stop_scanning(app);
@@ -248,7 +235,7 @@ bool hid_reader_scene_startscreen_on_event(void* context, SceneManagerEvent even
         case HidReaderCustomEventRfidDetected:
             // RFID tag detected
             FURI_LOG_I("HidReaderScene", "Event RfidDetected: mode=%d, scan_state=%d", app->mode, app->scan_state);
-            if(app->mode == HidReaderModeRfid || app->mode == HidReaderModeAny) {
+            if(app->mode == HidReaderModeRfid) {
                 // Single tag mode - output immediately
                 FURI_LOG_D("HidReaderScene", "RFID single/any mode - stopping and outputting");
                 hid_reader_scene_startscreen_stop_scanning(app);

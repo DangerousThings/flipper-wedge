@@ -4,10 +4,9 @@
 #include <input/input.h>
 #include <gui/elements.h>
 
-#define MODE_COUNT 6
+#define MODE_COUNT 5
 
 static const char* mode_names[] = {
-    "Any",
     "NFC",
     "RFID",
     "NFC -> RFID",
@@ -109,7 +108,7 @@ void hid_reader_startscreen_draw(Canvas* canvas, HidReaderStartscreenModel* mode
 static void hid_reader_startscreen_model_init(HidReaderStartscreenModel* const model) {
     model->usb_connected = false;
     model->bt_connected = false;
-    model->mode = HidReaderModeAny;
+    model->mode = HidReaderModeNfc;
     model->display_state = HidReaderDisplayStateIdle;
     model->status_text[0] = '\0';
     model->uid_text[0] = '\0';
@@ -250,6 +249,19 @@ void hid_reader_startscreen_set_mode(
             model->mode = mode;
         },
         true);
+}
+
+uint8_t hid_reader_startscreen_get_mode(HidReaderStartscreen* instance) {
+    furi_assert(instance);
+    uint8_t mode = 0;
+    with_view_model(
+        instance->view,
+        HidReaderStartscreenModel * model,
+        {
+            mode = model->mode;
+        },
+        false);
+    return mode;
 }
 
 void hid_reader_startscreen_set_display_state(

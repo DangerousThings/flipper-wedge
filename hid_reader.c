@@ -48,7 +48,7 @@ HidReader* hid_reader_app_alloc() {
     app->bt_enabled = true;
 
     // Scanning defaults
-    app->mode = HidReaderModeAny;  // Default: Any tag (NFC or RFID)
+    app->mode = HidReaderModeNfc;  // Default: NFC only
     app->scan_state = HidReaderScanStateIdle;
     app->delimiter[0] = '\0';  // Empty delimiter by default
     app->append_enter = true;
@@ -61,7 +61,7 @@ HidReader* hid_reader_app_alloc() {
     app->output_buffer[0] = '\0';
 
     // Allocate and start HID module
-    bool usb_hid_enabled = false;  // Disabled for serial debugging
+    bool usb_hid_enabled = false;  // Disabled temporarily for serial debugging
     app->hid = hid_reader_hid_alloc();
     hid_reader_hid_start(app->hid, usb_hid_enabled, app->bt_enabled);
 
@@ -74,6 +74,7 @@ HidReader* hid_reader_app_alloc() {
     // Timers will be created as needed
     app->timeout_timer = NULL;
     app->display_timer = NULL;
+
 
     // Used for File Browser
     app->dialogs = furi_record_open(RECORD_DIALOGS);

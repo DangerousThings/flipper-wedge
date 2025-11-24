@@ -33,7 +33,6 @@
 
 // Scan modes
 typedef enum {
-    HidReaderModeAny,           // Any tag (NFC or RFID) - first detected wins
     HidReaderModeNfc,           // NFC only
     HidReaderModeRfid,          // RFID only
     HidReaderModeNfcThenRfid,   // NFC -> RFID combo

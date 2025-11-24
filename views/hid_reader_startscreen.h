@@ -37,6 +37,8 @@ void hid_reader_startscreen_set_mode(
     HidReaderStartscreen* instance,
     uint8_t mode);
 
+uint8_t hid_reader_startscreen_get_mode(HidReaderStartscreen* instance);
+
 void hid_reader_startscreen_set_display_state(
     HidReaderStartscreen* instance,
     HidReaderDisplayState state);

@@ -18,7 +18,7 @@ This file provides guidance for developing the Contactless HID Reader Flipper Ze
 3. Parse NDEF text records from NFC tags
 4. Output via USB HID keyboard
 5. Output via Bluetooth HID keyboard
-6. 5 scanning modes + Bluetooth pairing
+6. 4 scanning modes + Bluetooth pairing
 7. Configurable delimiter, Enter key append, NDEF toggle
 
 ### Specification Document
@@ -172,7 +172,6 @@ typedef enum {
     HidReaderModeRfid,
     HidReaderModeNfcThenRfid,
     HidReaderModeRfidThenNfc,
-    HidReaderModeScanOrder,
 } HidReaderMode;
 
 typedef enum {
@@ -254,9 +253,8 @@ Follow this exact order to ensure incremental, testable progress:
 ### Phase 7: Scan Modes
 1. Implement single-tag modes (NFC only, RFID only)
 2. Implement combo mode state machine
-3. Implement Scan Order mode (poll alternation)
-4. Implement timeout handling
-5. **TEST CHECKPOINT**: All 5 modes work correctly
+3. Implement timeout handling
+4. **TEST CHECKPOINT**: All 4 modes work correctly
 
 ### Phase 8: UI Polish
 1. Implement home screen with mode selector
@@ -317,7 +315,6 @@ Follow this exact order to ensure incremental, testable progress:
 - [ ] NFC→RFID: timeout if second tag missing
 - [ ] RFID→NFC: both scanned → combined output
 - [ ] RFID→NFC: timeout if second tag missing
-- [ ] Scan Order: first detected wins
 
 #### UI Tests
 - [ ] Mode selector navigates correctly
@@ -361,7 +358,6 @@ Follow this exact order to ensure incremental, testable progress:
 ### NFC/RFID API
 - NFC and RFID cannot poll simultaneously (hardware limitation)
 - Must stop one worker before starting the other
-- In Scan Order mode, alternate polling with ~10-15ms intervals
 - Tag presence is detected by successful read, absence by failed read
 
 ### Scene Manager
