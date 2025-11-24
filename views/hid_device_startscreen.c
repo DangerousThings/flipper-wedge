@@ -192,11 +192,9 @@ void hid_device_startscreen_exit(void* context) {
 void hid_device_startscreen_enter(void* context) {
     furi_assert(context);
     HidDeviceStartscreen* instance = (HidDeviceStartscreen*)context;
-    with_view_model(
-        instance->view,
-        HidDeviceStartscreenModel * model,
-        { hid_device_startscreen_model_init(model); },
-        true);
+    UNUSED(instance);
+    // Model is initialized during allocation and updated via setters
+    // Don't reset state when view becomes active
 }
 
 HidDeviceStartscreen* hid_device_startscreen_alloc() {

@@ -271,6 +271,10 @@ bool hid_device_scene_startscreen_on_event(void* context, SceneManagerEvent even
             // Get the new mode from the view (the view already updated it)
             app->mode = hid_device_startscreen_get_mode(app->hid_device_startscreen);
             FURI_LOG_I("HidDeviceScene", "Mode changed to: %d", app->mode);
+
+            // Save mode to persistent storage
+            hid_device_save_settings(app);
+
             hid_device_scene_startscreen_start_scanning(app);
             consumed = true;
             break;

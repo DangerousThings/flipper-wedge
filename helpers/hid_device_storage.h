@@ -13,6 +13,7 @@
 #define HID_DEVICE_SETTINGS_HEADER "HidDevice Config File"
 #define HID_DEVICE_SETTINGS_KEY_DELIMITER "Delimiter"
 #define HID_DEVICE_SETTINGS_KEY_APPEND_ENTER "AppendEnter"
+#define HID_DEVICE_SETTINGS_KEY_MODE "Mode"
 
 void hid_device_save_settings(void* context);
 void hid_device_read_settings(void* context);
