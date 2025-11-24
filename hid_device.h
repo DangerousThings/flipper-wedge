@@ -85,6 +85,7 @@ typedef struct {
     uint8_t nfc_uid[HID_DEVICE_NFC_UID_MAX_LEN];
     uint8_t nfc_uid_len;
     char ndef_text[HID_DEVICE_NDEF_MAX_LEN];
+    HidDeviceNfcError nfc_error;
     uint8_t rfid_uid[HID_DEVICE_RFID_UID_MAX_LEN];
     uint8_t rfid_uid_len;
 

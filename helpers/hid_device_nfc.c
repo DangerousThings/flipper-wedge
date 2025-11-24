@@ -183,7 +183,14 @@ static NfcCommand hid_device_nfc_poller_callback_iso14443_3a(NfcGenericEvent eve
                     instance->last_data.has_ndef = false;
                     instance->last_data.ndef_text[0] = '\0';
 
-                    FURI_LOG_I(TAG, "Got ISO14443-3A UID, len: %d", instance->last_data.uid_len);
+                    // ISO14443-3A doesn't support NDEF - if NDEF was requested, mark as unsupported
+                    if(instance->parse_ndef) {
+                        instance->last_data.error = HidDeviceNfcErrorUnsupportedType;
+                        FURI_LOG_I(TAG, "Got ISO14443-3A UID (unsupported for NDEF), len: %d", instance->last_data.uid_len);
+                    } else {
+                        instance->last_data.error = HidDeviceNfcErrorNone;
+                        FURI_LOG_I(TAG, "Got ISO14443-3A UID, len: %d", instance->last_data.uid_len);
+                    }
                     instance->state = HidDeviceNfcStateSuccess;
 
                     // Signal the owner thread that we have data
@@ -234,7 +241,14 @@ static NfcCommand hid_device_nfc_poller_callback_iso14443_4a(NfcGenericEvent eve
                         instance->last_data.has_ndef = false;
                         instance->last_data.ndef_text[0] = '\0';
 
-                        FURI_LOG_I(TAG, "Got ISO14443-4A UID, len: %d", instance->last_data.uid_len);
+                        // ISO14443-4A is Type 4 NDEF - not yet supported for NDEF parsing
+                        if(instance->parse_ndef) {
+                            instance->last_data.error = HidDeviceNfcErrorUnsupportedType;
+                            FURI_LOG_I(TAG, "Got ISO14443-4A UID (Type 4 NDEF not supported), len: %d", instance->last_data.uid_len);
+                        } else {
+                            instance->last_data.error = HidDeviceNfcErrorNone;
+                            FURI_LOG_I(TAG, "Got ISO14443-4A UID, len: %d", instance->last_data.uid_len);
+                        }
                         instance->state = HidDeviceNfcStateSuccess;
                     }
                 } else {
@@ -281,6 +295,7 @@ static NfcCommand hid_device_nfc_poller_callback_mf_ultralight(NfcGenericEvent e
                         memcpy(instance->last_data.uid, iso3a_data->uid, uid_len);
                         instance->last_data.has_ndef = false;
                         instance->last_data.ndef_text[0] = '\0';
+                        instance->last_data.error = HidDeviceNfcErrorNone;
 
                         FURI_LOG_I(TAG, "Got MF Ultralight UID, len: %d", instance->last_data.uid_len);
 
@@ -305,10 +320,17 @@ static NfcCommand hid_device_nfc_poller_callback_mf_ultralight(NfcGenericEvent e
 
                             if(text_len > 0) {
                                 instance->last_data.has_ndef = true;
+                                instance->last_data.error = HidDeviceNfcErrorNone;
                                 FURI_LOG_I(TAG, "Found NDEF text: %s", instance->last_data.ndef_text);
                             } else {
-                                FURI_LOG_D(TAG, "No NDEF text records found");
+                                // Type 2 tag but no NDEF text record found
+                                instance->last_data.error = HidDeviceNfcErrorNoTextRecord;
+                                FURI_LOG_D(TAG, "No NDEF text records found on Type 2 tag");
                             }
+                        } else if(instance->parse_ndef) {
+                            // Not enough pages read for NDEF
+                            instance->last_data.error = HidDeviceNfcErrorNoTextRecord;
+                            FURI_LOG_D(TAG, "Not enough pages for NDEF (pages_read=%d)", mfu_data->pages_read);
                         }
 
                         instance->state = HidDeviceNfcStateSuccess;
@@ -353,7 +375,14 @@ static NfcCommand hid_device_nfc_poller_callback_iso15693(NfcGenericEvent event,
                 instance->last_data.has_ndef = false;
                 instance->last_data.ndef_text[0] = '\0';
 
-                FURI_LOG_I(TAG, "Got ISO15693 UID, len: %d", instance->last_data.uid_len);
+                // ISO15693 is Type 5 NDEF - not yet supported for NDEF parsing
+                if(instance->parse_ndef) {
+                    instance->last_data.error = HidDeviceNfcErrorUnsupportedType;
+                    FURI_LOG_I(TAG, "Got ISO15693 UID (Type 5 NDEF not supported), len: %d", instance->last_data.uid_len);
+                } else {
+                    instance->last_data.error = HidDeviceNfcErrorNone;
+                    FURI_LOG_I(TAG, "Got ISO15693 UID, len: %d", instance->last_data.uid_len);
+                }
 
                 // TODO: Add Type 5 NDEF parsing if parse_ndef is enabled
                 // For now, we just read the UID

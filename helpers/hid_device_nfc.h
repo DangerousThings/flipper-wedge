@@ -14,11 +14,18 @@
 
 typedef struct HidDeviceNfc HidDeviceNfc;
 
+typedef enum {
+    HidDeviceNfcErrorNone,           // Success
+    HidDeviceNfcErrorUnsupportedType, // Tag detected but unsupported NFC Forum Type for NDEF
+    HidDeviceNfcErrorNoTextRecord,    // Supported type but no NDEF text record found
+} HidDeviceNfcError;
+
 typedef struct {
     uint8_t uid[HID_DEVICE_NFC_UID_MAX_LEN];
     uint8_t uid_len;
     char ndef_text[HID_DEVICE_NDEF_MAX_LEN];
     bool has_ndef;
+    HidDeviceNfcError error;
 } HidDeviceNfcData;
 
 typedef void (*HidDeviceNfcCallback)(HidDeviceNfcData* data, void* context);

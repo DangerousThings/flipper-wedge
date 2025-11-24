@@ -41,7 +41,8 @@ static void hid_device_scene_startscreen_display_timer_callback(void* context) {
             HidDeviceStartscreenModel * model,
             {
                 // Error messages don't need "Sent" confirmation
-                is_error = (strstr(model->status_text, "No NDEF Found") != NULL);
+                is_error = (strstr(model->status_text, "Unsupported") != NULL) ||
+                          (strstr(model->status_text, "No Text Record") != NULL);
             },
             false);
 
@@ -84,11 +85,12 @@ static void hid_device_scene_startscreen_nfc_callback(HidDeviceNfcData* data, vo
     furi_assert(context);
     HidDevice* app = context;
 
-    FURI_LOG_I("HidDeviceScene", "NFC callback: uid_len=%d, has_ndef=%d", data->uid_len, data->has_ndef);
+    FURI_LOG_I("HidDeviceScene", "NFC callback: uid_len=%d, has_ndef=%d, error=%d", data->uid_len, data->has_ndef, data->error);
 
     // Store the NFC data
     app->nfc_uid_len = data->uid_len;
     memcpy(app->nfc_uid, data->uid, data->uid_len);
+    app->nfc_error = data->error;
 
     // In NDEF mode, only store NDEF text; in other NFC modes, store UID
     if(data->has_ndef) {
@@ -284,15 +286,29 @@ bool hid_device_scene_startscreen_on_event(void* context, SceneManagerEvent even
                 hid_device_scene_startscreen_stop_scanning(app);
                 hid_device_scene_startscreen_output_and_reset(app);
             } else if(app->mode == HidDeviceModeNdef) {
-                // NDEF mode - check if NDEF was found
+                // NDEF mode - check the error status to distinguish between cases
+                // We need to retrieve the error from the NFC data that was stored in the callback
+                // Since we're in the custom event handler, we need to check what happened
+
                 if(app->ndef_text[0] != '\0') {
-                    // NDEF found - output it
-                    FURI_LOG_D("HidDeviceScene", "NDEF mode - NDEF found, outputting");
+                    // NDEF text found - output it
+                    FURI_LOG_D("HidDeviceScene", "NDEF mode - NDEF text found, outputting");
                     hid_device_scene_startscreen_stop_scanning(app);
                     hid_device_scene_startscreen_output_and_reset(app);
                 } else {
-                    // No NDEF - show error with red LED (non-blocking)
-                    FURI_LOG_D("HidDeviceScene", "NDEF mode - No NDEF found, showing error");
+                    // No NDEF text - determine error message based on nfc_error field
+                    const char* error_msg;
+                    if(app->nfc_error == HidDeviceNfcErrorUnsupportedType) {
+                        error_msg = "Unsupported NFC Forum Type";
+                        FURI_LOG_D("HidDeviceScene", "NDEF mode - Unsupported NFC Forum Type");
+                    } else if(app->nfc_error == HidDeviceNfcErrorNoTextRecord) {
+                        error_msg = "No Text Record Found";
+                        FURI_LOG_D("HidDeviceScene", "NDEF mode - No text record found");
+                    } else {
+                        // Fallback for any other case
+                        error_msg = "No Text Record Found";
+                        FURI_LOG_D("HidDeviceScene", "NDEF mode - Unknown error");
+                    }
 
                     // IMPORTANT: Stop the scanner before showing error to prevent conflicts
                     hid_device_scene_startscreen_stop_scanning(app);
@@ -311,7 +327,7 @@ bool hid_device_scene_startscreen_on_event(void* context, SceneManagerEvent even
 
                     // Show error message
                     hid_device_startscreen_set_uid_text(app->hid_device_startscreen, "");
-                    hid_device_startscreen_set_status_text(app->hid_device_startscreen, "No NDEF Found");
+                    hid_device_startscreen_set_status_text(app->hid_device_startscreen, error_msg);
                     hid_device_startscreen_set_display_state(app->hid_device_startscreen, HidDeviceDisplayStateResult);
 
                     // Clear data
