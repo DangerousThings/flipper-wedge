@@ -5,12 +5,6 @@ enum SettingsIndex {
     SettingsIndexDelimiter,
     SettingsIndexAppendEnter,
     SettingsIndexNdefEnabled,
-    SettingsIndexScanTextRecord,  // Only shown when NDEF is enabled
-};
-
-// Custom event for settings
-enum SettingsCustomEvent {
-    SettingsCustomEventScanTextRecord = 100,
 };
 
 const char* const on_off_text[2] = {
@@ -80,10 +74,6 @@ static void hid_device_scene_settings_set_ndef_enabled(VariableItem* item) {
 
     variable_item_set_current_value_text(item, on_off_text[index]);
     app->ndef_enabled = (index == 1);
-
-    // Rebuild menu to show/hide "Scan Text Record" option
-    variable_item_list_reset(app->variable_item_list);
-    hid_device_scene_settings_on_enter(app);
 }
 
 static void hid_device_scene_settings_item_callback(void* context, uint32_t index) {
@@ -126,11 +116,6 @@ void hid_device_scene_settings_on_enter(void* context) {
     variable_item_set_current_value_index(item, app->ndef_enabled ? 1 : 0);
     variable_item_set_current_value_text(item, on_off_text[app->ndef_enabled ? 1 : 0]);
 
-    // Scan Text Record - only shown when NDEF is enabled
-    if(app->ndef_enabled) {
-        item = variable_item_list_add(app->variable_item_list, "Scan Text Record", 0, NULL, app);
-    }
-
     // Set callback for when user clicks on an item
     variable_item_list_set_enter_callback(
         app->variable_item_list,
@@ -144,18 +129,7 @@ bool hid_device_scene_settings_on_event(void* context, SceneManagerEvent event) 
     HidDevice* app = context;
     bool consumed = false;
 
-    if(event.type == SceneManagerEventTypeCustom) {
-        // User selected an item - determine which one
-        uint32_t selected_item =
-            variable_item_list_get_selected_item_index(app->variable_item_list);
-
-        if(app->ndef_enabled && selected_item == SettingsIndexScanTextRecord) {
-            // Scan Text Record - TODO: implement NDEF inspector scene
-            // For now, just acknowledge the selection
-            FURI_LOG_I("Settings", "Scan Text Record selected - feature coming soon");
-            consumed = true;
-        }
-    } else if(event.type == SceneManagerEventTypeBack) {
+    if(event.type == SceneManagerEventTypeBack) {
         // Save settings when leaving
         hid_device_save_settings(app);
     }
