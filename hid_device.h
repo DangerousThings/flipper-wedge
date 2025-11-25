@@ -92,6 +92,7 @@ typedef struct {
     // Settings
     char delimiter[HID_DEVICE_DELIMITER_MAX_LEN];
     bool append_enter;
+    bool usb_debug_mode;  // Disable USB HID for CLI debugging
 
     // Timers
     FuriTimer* timeout_timer;

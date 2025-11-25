@@ -57,6 +57,8 @@ void hid_device_save_settings(void* context) {
     flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE, &mode, 1);
     flipper_format_write_bool(
         fff_file, HID_DEVICE_SETTINGS_KEY_BT_ENABLED, &app->bt_enabled, 1);
+    flipper_format_write_bool(
+        fff_file, HID_DEVICE_SETTINGS_KEY_USB_DEBUG, &app->usb_debug_mode, 1);
 
     if(!flipper_format_rewind(fff_file)) {
         hid_device_close_config_file(fff_file);
@@ -129,6 +131,12 @@ void hid_device_read_settings(void* context) {
     bool bt_enabled = true;
     if(flipper_format_read_bool(fff_file, HID_DEVICE_SETTINGS_KEY_BT_ENABLED, &bt_enabled, 1)) {
         app->bt_enabled = bt_enabled;
+    }
+
+    // Read USB debug mode setting (default to false)
+    bool usb_debug = false;
+    if(flipper_format_read_bool(fff_file, HID_DEVICE_SETTINGS_KEY_USB_DEBUG, &usb_debug, 1)) {
+        app->usb_debug_mode = usb_debug;
     }
 
     flipper_format_rewind(fff_file);

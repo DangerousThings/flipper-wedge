@@ -194,6 +194,12 @@ static void hid_device_scene_startscreen_start_scanning(HidDevice* app) {
     }
 
     FURI_LOG_I("HidDeviceScene", "start_scanning: mode=%d, current scan_state=%d", app->mode, app->scan_state);
+
+    // Clear previous scan state to ensure fresh start
+    app->nfc_error = HidDeviceNfcErrorNone;
+    app->nfc_uid_len = 0;
+    app->ndef_text[0] = '\0';
+
     app->scan_state = HidDeviceScanStateScanning;
     // Keep display in Idle state to show mode selector while scanning
 

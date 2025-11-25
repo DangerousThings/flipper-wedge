@@ -15,6 +15,7 @@
 #define HID_DEVICE_SETTINGS_KEY_APPEND_ENTER "AppendEnter"
 #define HID_DEVICE_SETTINGS_KEY_MODE "Mode"
 #define HID_DEVICE_SETTINGS_KEY_BT_ENABLED "BtEnabled"
+#define HID_DEVICE_SETTINGS_KEY_USB_DEBUG "UsbDebug"
 
 void hid_device_save_settings(void* context);
 void hid_device_read_settings(void* context);

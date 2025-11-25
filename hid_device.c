@@ -42,6 +42,7 @@ HidDevice* hid_device_app_alloc() {
 
     // Set defaults
     app->bt_enabled = true;
+    app->usb_debug_mode = false;  // USB HID enabled by default
 
     // Scanning defaults
     app->mode = HidDeviceModeNfc;  // Default: NFC only
@@ -63,7 +64,8 @@ HidDevice* hid_device_app_alloc() {
     hid_device_read_settings(app);
 
     // Allocate and start HID module with loaded settings
-    bool usb_hid_enabled = true;  // Enable USB HID
+    // USB HID disabled if USB debug mode is enabled (for CLI access)
+    bool usb_hid_enabled = !app->usb_debug_mode;
     app->hid = hid_device_hid_alloc();
     hid_device_hid_start(app->hid, usb_hid_enabled, app->bt_enabled);
 

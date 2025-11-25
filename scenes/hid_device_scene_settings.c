@@ -4,6 +4,7 @@
 enum SettingsIndex {
     SettingsIndexDelimiter,
     SettingsIndexAppendEnter,
+    SettingsIndexUsbDebug,
     SettingsIndexBtEnable,
     SettingsIndexBtPair,
 };
@@ -69,6 +70,17 @@ static void hid_device_scene_settings_set_append_enter(VariableItem* item) {
     app->append_enter = (index == 1);
 }
 
+static void hid_device_scene_settings_set_usb_debug(VariableItem* item) {
+    HidDevice* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+
+    variable_item_set_current_value_text(item, on_off_text[index]);
+    app->usb_debug_mode = (index == 1);
+
+    // Note: USB HID changes require app restart, show message if needed
+    // For now, just save the setting - it will take effect on next app launch
+}
+
 static void hid_device_scene_settings_set_bt_enable(VariableItem* item) {
     HidDevice* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
@@ -122,6 +134,16 @@ void hid_device_scene_settings_on_enter(void* context) {
         app);
     variable_item_set_current_value_index(item, app->append_enter ? 1 : 0);
     variable_item_set_current_value_text(item, on_off_text[app->append_enter ? 1 : 0]);
+
+    // USB Debug Mode toggle
+    item = variable_item_list_add(
+        app->variable_item_list,
+        "USB Debug Mode:",
+        2,
+        hid_device_scene_settings_set_usb_debug,
+        app);
+    variable_item_set_current_value_index(item, app->usb_debug_mode ? 1 : 0);
+    variable_item_set_current_value_text(item, on_off_text[app->usb_debug_mode ? 1 : 0]);
 
     // Enable Bluetooth HID toggle
     item = variable_item_list_add(

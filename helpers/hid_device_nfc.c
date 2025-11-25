@@ -8,8 +8,26 @@
 #include <nfc/protocols/iso15693_3/iso15693_3.h>
 #include <nfc/protocols/iso15693_3/iso15693_3_poller.h>
 #include <toolbox/simple_array.h>
+#include <toolbox/bit_buffer.h>
 
 #define TAG "HidDeviceNfc"
+
+// Type 4 NDEF constants
+#define NDEF_T4_AID_LEN 7
+static const uint8_t NDEF_T4_AID[NDEF_T4_AID_LEN] = {
+    0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x01
+};
+
+#define NDEF_T4_FILE_ID_CC 0xE103      // Capability Container
+#define NDEF_T4_FILE_ID_NDEF 0xE104    // NDEF Message
+
+// APDU retry configuration
+#define NDEF_T4_MAX_RETRIES 3          // Maximum retry attempts for APDU commands
+#define NDEF_T4_RETRY_DELAY_MS 15      // Delay between retries in milliseconds
+
+// APDU status codes
+#define APDU_SW1_SUCCESS 0x90
+#define APDU_SW2_SUCCESS 0x00
 
 typedef enum {
     HidDeviceNfcStateIdle,
@@ -39,6 +57,109 @@ struct HidDeviceNfc {
 
 // Simple NDEF text record parser
 // Returns number of bytes written to output, 0 if no text records found
+// Parse raw NDEF records (for Type 4 tags - no TLV wrapping)
+static size_t hid_device_nfc_parse_raw_ndef_text(const uint8_t* data, size_t data_len, char* output, size_t output_max) {
+    if(!data || !output || data_len < 4 || output_max == 0) {
+        return 0;
+    }
+
+    size_t output_pos = 0;
+    size_t pos = 0;
+
+    // Parse NDEF message records directly (no TLV wrapper)
+    while(pos < data_len) {
+        // Read record header
+        if(pos + 1 > data_len) break;
+        uint8_t flags_tnf = data[pos++];
+
+        uint8_t tnf = flags_tnf & 0x07;
+        bool short_record = (flags_tnf & 0x10) != 0;
+        bool id_length_present = (flags_tnf & 0x08) != 0;
+        bool message_end = (flags_tnf & 0x40) != 0;
+
+        // Read type length
+        if(pos >= data_len) break;
+        uint8_t type_len = data[pos++];
+
+        // Read payload length
+        if(pos >= data_len) break;
+        uint32_t payload_len;
+        if(short_record) {
+            payload_len = data[pos++];
+        } else {
+            if(pos + 4 > data_len) break;
+            payload_len = (data[pos] << 24) | (data[pos + 1] << 16) |
+                         (data[pos + 2] << 8) | data[pos + 3];
+            pos += 4;
+        }
+
+        // Read ID length if present
+        uint8_t id_len = 0;
+        if(id_length_present) {
+            if(pos >= data_len) break;
+            id_len = data[pos++];
+        }
+
+        // Read type
+        if(pos + type_len > data_len) break;
+        const uint8_t* type = &data[pos];
+        pos += type_len;
+
+        // Skip ID
+        if(pos + id_len > data_len) break;
+        pos += id_len;
+
+        // Read payload
+        if(pos + payload_len > data_len) break;
+        const uint8_t* payload = &data[pos];
+        pos += payload_len;
+
+        // Check if this is a text record (TNF=0x01, Type='T')
+        if(tnf == 0x01 && type_len == 1 && type[0] == 'T' && payload_len > 1) {
+            FURI_LOG_I(TAG, "Type 4 NDEF: Found text record in raw NDEF");
+
+            // Text record format: [status byte][language code][text]
+            uint8_t status = payload[0];
+            uint8_t lang_len = status & 0x3F;
+
+            FURI_LOG_I(TAG, "Type 4 NDEF: Status=0x%02X, lang_len=%d, payload_len=%lu",
+                       status, lang_len, payload_len);
+
+            if((uint32_t)(lang_len + 1) <= payload_len) {
+                // Skip language code, extract text
+                const uint8_t* text = &payload[1 + lang_len];
+                size_t text_len = payload_len - 1 - lang_len;
+
+                FURI_LOG_I(TAG, "Type 4 NDEF: Text length=%zu", text_len);
+
+                // Copy text to output
+                size_t copy_len = text_len;
+                if(output_pos + copy_len >= output_max) {
+                    copy_len = output_max - output_pos - 1;
+                }
+                if(copy_len > 0) {
+                    memcpy(&output[output_pos], text, copy_len);
+                    output_pos += copy_len;
+                }
+            }
+        }
+
+        // Stop if this was the last record
+        if(message_end) break;
+    }
+
+    // Null-terminate
+    if(output_pos < output_max) {
+        output[output_pos] = '\0';
+    } else if(output_max > 0) {
+        output[output_max - 1] = '\0';
+    }
+
+    FURI_LOG_I(TAG, "Type 4 NDEF: Parsed %zu bytes of text", output_pos);
+    return output_pos;
+}
+
+// Parse TLV-wrapped NDEF records (for Type 2/5 tags)
 static size_t hid_device_nfc_parse_ndef_text(const uint8_t* data, size_t data_len, char* output, size_t output_max) {
     if(!data || !output || data_len < 4 || output_max == 0) {
         return 0;
@@ -160,6 +281,286 @@ static size_t hid_device_nfc_parse_ndef_text(const uint8_t* data, size_t data_le
     return output_pos;
 }
 
+// Type 4 NDEF APDU Helper Functions
+
+// Check if APDU response has success status (90 00)
+static bool hid_device_nfc_t4_check_apdu_success(const BitBuffer* rx_buffer) {
+    size_t resp_len = bit_buffer_get_size_bytes(rx_buffer);
+    if(resp_len < 2) return false;
+
+    uint8_t sw1 = bit_buffer_get_byte(rx_buffer, resp_len - 2);
+    uint8_t sw2 = bit_buffer_get_byte(rx_buffer, resp_len - 1);
+
+    return (sw1 == APDU_SW1_SUCCESS && sw2 == APDU_SW2_SUCCESS);
+}
+
+// Build SELECT by AID APDU command
+static void hid_device_nfc_t4_build_select_app_apdu(BitBuffer* tx_buffer) {
+    bit_buffer_reset(tx_buffer);
+    bit_buffer_append_byte(tx_buffer, 0x00);  // CLA
+    bit_buffer_append_byte(tx_buffer, 0xA4);  // INS (SELECT)
+    bit_buffer_append_byte(tx_buffer, 0x04);  // P1 (select by name/AID)
+    bit_buffer_append_byte(tx_buffer, 0x00);  // P2
+    bit_buffer_append_byte(tx_buffer, NDEF_T4_AID_LEN);  // Lc (data length)
+    bit_buffer_append_bytes(tx_buffer, NDEF_T4_AID, NDEF_T4_AID_LEN);  // AID data
+    // Note: Some Type 4 tags don't require Le for SELECT, trying without it first
+}
+
+// Build SELECT by File ID APDU command
+static void hid_device_nfc_t4_build_select_file_apdu(BitBuffer* tx_buffer, uint16_t file_id) {
+    bit_buffer_reset(tx_buffer);
+    bit_buffer_append_byte(tx_buffer, 0x00);  // CLA
+    bit_buffer_append_byte(tx_buffer, 0xA4);  // INS (SELECT)
+    bit_buffer_append_byte(tx_buffer, 0x00);  // P1 (select by file ID)
+    bit_buffer_append_byte(tx_buffer, 0x0C);  // P2 (first or only occurrence)
+    bit_buffer_append_byte(tx_buffer, 0x02);  // Lc (2 bytes for file ID)
+    bit_buffer_append_byte(tx_buffer, (file_id >> 8) & 0xFF);  // File ID MSB
+    bit_buffer_append_byte(tx_buffer, file_id & 0xFF);  // File ID LSB
+    // Note: No Le needed for SELECT file
+}
+
+// Build READ BINARY APDU command
+static void hid_device_nfc_t4_build_read_binary_apdu(
+    BitBuffer* tx_buffer,
+    uint16_t offset,
+    uint8_t length) {
+    bit_buffer_reset(tx_buffer);
+    bit_buffer_append_byte(tx_buffer, 0x00);  // CLA
+    bit_buffer_append_byte(tx_buffer, 0xB0);  // INS (READ BINARY)
+    bit_buffer_append_byte(tx_buffer, (offset >> 8) & 0xFF);  // P1 (offset MSB)
+    bit_buffer_append_byte(tx_buffer, offset & 0xFF);  // P2 (offset LSB)
+    bit_buffer_append_byte(tx_buffer, length);  // Le (bytes to read)
+}
+
+// Read Type 4 NDEF data from ISO14443-4A tag
+static bool hid_device_nfc_read_type4_ndef(
+    Iso14443_4aPoller* poller,
+    HidDeviceNfcData* data) {
+
+    BitBuffer* tx_buffer = bit_buffer_alloc(256);
+    BitBuffer* rx_buffer = bit_buffer_alloc(256);
+    bool success = false;
+
+    FURI_LOG_I(TAG, "========== Type 4 NDEF: Starting NDEF read sequence ==========");
+
+    do {
+        // Step 1: SELECT NDEF Application (with retry logic)
+        FURI_LOG_I(TAG, "Type 4 NDEF: Step 1 - SELECT NDEF Application (AID: D2760000850101)");
+
+        Iso14443_4aError error = Iso14443_4aErrorNone;
+        bool select_success = false;
+
+        for(uint8_t retry = 0; retry < NDEF_T4_MAX_RETRIES; retry++) {
+            if(retry > 0) {
+                FURI_LOG_I(TAG, "Type 4 NDEF: Retry attempt %d/%d after %dms delay",
+                           retry + 1, NDEF_T4_MAX_RETRIES, NDEF_T4_RETRY_DELAY_MS);
+                furi_delay_ms(NDEF_T4_RETRY_DELAY_MS);
+            }
+
+            hid_device_nfc_t4_build_select_app_apdu(tx_buffer);
+            error = iso14443_4a_poller_send_block(poller, tx_buffer, rx_buffer);
+
+            if(error == Iso14443_4aErrorNone) {
+                // Log response for debugging
+                size_t resp_len = bit_buffer_get_size_bytes(rx_buffer);
+                FURI_LOG_I(TAG, "Type 4 NDEF: SELECT app response length: %zu bytes", resp_len);
+                if(resp_len >= 2) {
+                    uint8_t sw1 = bit_buffer_get_byte(rx_buffer, resp_len - 2);
+                    uint8_t sw2 = bit_buffer_get_byte(rx_buffer, resp_len - 1);
+                    FURI_LOG_I(TAG, "Type 4 NDEF: SELECT app status: SW1=%02X SW2=%02X", sw1, sw2);
+                } else {
+                    FURI_LOG_E(TAG, "Type 4 NDEF: Response too short!");
+                }
+
+                if(hid_device_nfc_t4_check_apdu_success(rx_buffer)) {
+                    select_success = true;
+                    FURI_LOG_I(TAG, "Type 4 NDEF: NDEF application selected successfully");
+                    break;
+                } else {
+                    // Application not found (APDU status error) - don't retry
+                    FURI_LOG_W(TAG, "Type 4 NDEF: No NDEF application found (invalid APDU status)");
+                    break;
+                }
+            } else {
+                // Communication error - will retry if attempts remain
+                FURI_LOG_W(TAG, "Type 4 NDEF: SELECT app failed, error=%d", error);
+            }
+        }
+
+        if(!select_success) {
+            data->error = HidDeviceNfcErrorUnsupportedType;
+            break;
+        }
+
+        // Step 2: SELECT Capability Container (CC) file
+        FURI_LOG_I(TAG, "Type 4 NDEF: Step 2 - SELECT CC file (0xE103)");
+        hid_device_nfc_t4_build_select_file_apdu(tx_buffer, NDEF_T4_FILE_ID_CC);
+        error = iso14443_4a_poller_send_block(poller, tx_buffer, rx_buffer);
+
+        if(error != Iso14443_4aErrorNone || !hid_device_nfc_t4_check_apdu_success(rx_buffer)) {
+            FURI_LOG_W(TAG, "Type 4 NDEF: SELECT CC file failed");
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            break;
+        }
+
+        FURI_LOG_I(TAG, "Type 4 NDEF: CC file selected successfully");
+
+        // Step 3: READ CC file (first 15 bytes to get structure)
+        FURI_LOG_I(TAG, "Type 4 NDEF: Step 3 - READ CC file");
+        hid_device_nfc_t4_build_read_binary_apdu(tx_buffer, 0, 15);
+        error = iso14443_4a_poller_send_block(poller, tx_buffer, rx_buffer);
+
+        if(error != Iso14443_4aErrorNone || !hid_device_nfc_t4_check_apdu_success(rx_buffer)) {
+            FURI_LOG_W(TAG, "Type 4 NDEF: READ CC file failed");
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            break;
+        }
+
+        size_t cc_len = bit_buffer_get_size_bytes(rx_buffer) - 2; // Subtract SW1 SW2
+        if(cc_len < 15) {
+            FURI_LOG_W(TAG, "Type 4 NDEF: CC too short (%zu bytes)", cc_len);
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            break;
+        }
+
+        // Parse and validate CC file structure
+        // Type 4 CC format:
+        // Bytes 0-1: CCLEN (CC file length)
+        // Byte 2: Mapping Version
+        // Bytes 3-4: MLe (max R-APDU data size)
+        // Bytes 5-6: MLc (max C-APDU data size)
+        // Byte 7+: TLV blocks
+
+        uint16_t cc_file_len = (bit_buffer_get_byte(rx_buffer, 0) << 8) |
+                               bit_buffer_get_byte(rx_buffer, 1);
+        uint8_t mapping_version = bit_buffer_get_byte(rx_buffer, 2);
+
+        FURI_LOG_I(TAG, "Type 4 NDEF: CC length=%d, version=0x%02X", cc_file_len, mapping_version);
+
+        // Validate mapping version (should be 0x10, 0x20, or 0x30)
+        if(mapping_version < 0x10 || mapping_version > 0x30) {
+            FURI_LOG_W(TAG, "Type 4 NDEF: Invalid mapping version 0x%02X", mapping_version);
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            break;
+        }
+
+        FURI_LOG_I(TAG, "Type 4 NDEF: Valid CC found");
+
+        // Step 4: SELECT NDEF Message file
+        hid_device_nfc_t4_build_select_file_apdu(tx_buffer, NDEF_T4_FILE_ID_NDEF);
+        error = iso14443_4a_poller_send_block(poller, tx_buffer, rx_buffer);
+
+        if(error != Iso14443_4aErrorNone || !hid_device_nfc_t4_check_apdu_success(rx_buffer)) {
+            FURI_LOG_W(TAG, "Type 4 NDEF: SELECT NDEF file failed");
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            break;
+        }
+
+        FURI_LOG_D(TAG, "Type 4 NDEF: NDEF file selected");
+
+        // Step 5: READ NDEF length (first 2 bytes)
+        hid_device_nfc_t4_build_read_binary_apdu(tx_buffer, 0, 2);
+        error = iso14443_4a_poller_send_block(poller, tx_buffer, rx_buffer);
+
+        if(error != Iso14443_4aErrorNone || !hid_device_nfc_t4_check_apdu_success(rx_buffer)) {
+            FURI_LOG_W(TAG, "Type 4 NDEF: READ NDEF length failed");
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            break;
+        }
+
+        if(bit_buffer_get_size_bytes(rx_buffer) < 4) { // 2 length bytes + SW1 SW2
+            FURI_LOG_W(TAG, "Type 4 NDEF: NDEF length response too short");
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            break;
+        }
+
+        uint16_t ndef_len = (bit_buffer_get_byte(rx_buffer, 0) << 8) |
+                            bit_buffer_get_byte(rx_buffer, 1);
+
+        if(ndef_len == 0) {
+            FURI_LOG_I(TAG, "Type 4 NDEF: Empty NDEF message");
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            break;
+        }
+
+        // Limit NDEF read to reasonable size
+        if(ndef_len > 240) {
+            FURI_LOG_W(TAG, "Type 4 NDEF: NDEF too large (%d bytes), limiting to 240", ndef_len);
+            ndef_len = 240;
+        }
+
+        FURI_LOG_D(TAG, "Type 4 NDEF: NDEF length = %d bytes", ndef_len);
+
+        // Step 6: READ NDEF Message data (skip 2-byte length prefix)
+        // Read in chunks if needed (most tags support up to 128-250 bytes per read)
+        uint8_t ndef_data[240];
+        uint16_t bytes_read = 0;
+
+        while(bytes_read < ndef_len) {
+            uint8_t chunk_size = (ndef_len - bytes_read > 128) ? 128 : (ndef_len - bytes_read);
+
+            hid_device_nfc_t4_build_read_binary_apdu(tx_buffer, 2 + bytes_read, chunk_size);
+            error = iso14443_4a_poller_send_block(poller, tx_buffer, rx_buffer);
+
+            if(error != Iso14443_4aErrorNone || !hid_device_nfc_t4_check_apdu_success(rx_buffer)) {
+                FURI_LOG_W(TAG, "Type 4 NDEF: READ NDEF chunk failed at offset %d", bytes_read);
+                break;
+            }
+
+            size_t chunk_received = bit_buffer_get_size_bytes(rx_buffer) - 2; // Subtract SW1 SW2
+            if(chunk_received == 0) {
+                FURI_LOG_W(TAG, "Type 4 NDEF: No data in chunk");
+                break;
+            }
+
+            // Copy chunk to buffer
+            for(size_t i = 0; i < chunk_received && bytes_read < ndef_len; i++) {
+                ndef_data[bytes_read++] = bit_buffer_get_byte(rx_buffer, i);
+            }
+
+            FURI_LOG_D(TAG, "Type 4 NDEF: Read %zu bytes, total %d/%d", chunk_received, bytes_read, ndef_len);
+        }
+
+        if(bytes_read == 0) {
+            FURI_LOG_W(TAG, "Type 4 NDEF: No NDEF data read");
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            break;
+        }
+
+        FURI_LOG_I(TAG, "Type 4 NDEF: Successfully read %d bytes", bytes_read);
+
+        // Log the raw NDEF data for debugging
+        FURI_LOG_I(TAG, "Type 4 NDEF: Raw data (first %d bytes):", bytes_read > 32 ? 32 : bytes_read);
+        for(uint16_t i = 0; i < bytes_read && i < 32; i++) {
+            FURI_LOG_I(TAG, "  [%02d] = 0x%02X", i, ndef_data[i]);
+        }
+
+        // Step 7: Parse NDEF message to extract text records
+        // Type 4 uses raw NDEF records (no TLV wrapping)
+        size_t text_len = hid_device_nfc_parse_raw_ndef_text(
+            ndef_data,
+            bytes_read,
+            data->ndef_text,
+            HID_DEVICE_NDEF_MAX_LEN);
+
+        if(text_len > 0) {
+            data->has_ndef = true;
+            data->error = HidDeviceNfcErrorNone;
+            success = true;
+            FURI_LOG_I(TAG, "Type 4 NDEF: Found text record: %s", data->ndef_text);
+        } else {
+            data->error = HidDeviceNfcErrorNoTextRecord;
+            FURI_LOG_D(TAG, "Type 4 NDEF: No text records found in NDEF message");
+        }
+
+    } while(false);
+
+    bit_buffer_free(tx_buffer);
+    bit_buffer_free(rx_buffer);
+
+    return success;
+}
+
 static NfcCommand hid_device_nfc_poller_callback_iso14443_3a(NfcGenericEvent event, void* context) {
     furi_assert(context);
     HidDeviceNfc* instance = context;
@@ -211,7 +612,8 @@ static NfcCommand hid_device_nfc_poller_callback_iso14443_4a(NfcGenericEvent eve
     furi_assert(context);
     HidDeviceNfc* instance = context;
 
-    FURI_LOG_D(TAG, "4A callback: protocol=%d", event.protocol);
+    FURI_LOG_I(TAG, "========== ISO14443-4A CALLBACK INVOKED ==========");
+    FURI_LOG_I(TAG, "4A callback: protocol=%d", event.protocol);
 
     // ISO14443-4A pollers receive both 3A and 4A events
     // We only care about the 4A Ready event which means the full handshake is done
@@ -220,8 +622,9 @@ static NfcCommand hid_device_nfc_poller_callback_iso14443_4a(NfcGenericEvent eve
         FURI_LOG_D(TAG, "4A event type: %d", iso4a_event->type);
 
         if(iso4a_event->type == Iso14443_4aPollerEventTypeReady) {
+            FURI_LOG_I(TAG, "4A poller event: READY - tag is activated");
             const Iso14443_4aData* iso4a_data = nfc_poller_get_data(instance->poller);
-            FURI_LOG_D(TAG, "4A data ptr: %p", (void*)iso4a_data);
+            FURI_LOG_I(TAG, "4A data ptr: %p", (void*)iso4a_data);
 
             if(iso4a_data) {
                 // Get the 3a base data which contains the UID
@@ -241,15 +644,30 @@ static NfcCommand hid_device_nfc_poller_callback_iso14443_4a(NfcGenericEvent eve
                         memcpy(instance->last_data.uid, iso3a_data->uid, uid_len);
                         instance->last_data.has_ndef = false;
                         instance->last_data.ndef_text[0] = '\0';
+                        instance->last_data.error = HidDeviceNfcErrorNone;
 
-                        // ISO14443-4A is Type 4 NDEF - not yet supported for NDEF parsing
-                        if(instance->parse_ndef) {
-                            instance->last_data.error = HidDeviceNfcErrorUnsupportedType;
-                            FURI_LOG_I(TAG, "Got ISO14443-4A UID (Type 4 NDEF not supported), len: %d", instance->last_data.uid_len);
-                        } else {
+                        // ISO14443-4A is Type 4 NDEF - ALWAYS try to read NDEF
+                        FURI_LOG_I(TAG, "Got ISO14443-4A UID, len: %d, attempting Type 4 NDEF read", instance->last_data.uid_len);
+
+                        // Attempt to read Type 4 NDEF data
+                        Iso14443_4aPoller* iso4a_poller = event.instance;
+                        hid_device_nfc_read_type4_ndef(iso4a_poller, &instance->last_data);
+
+                        // hid_device_nfc_read_type4_ndef sets error field:
+                        // - HidDeviceNfcErrorNone if NDEF text found
+                        // - HidDeviceNfcErrorUnsupportedType if no NDEF app
+                        // - HidDeviceNfcErrorNoTextRecord if NDEF exists but no text records
+
+                        // If we're NOT in NDEF-only mode, we still want to output UID even if NDEF fails
+                        if(!instance->parse_ndef) {
+                            // NFC mode: UID is always valid, NDEF is optional
+                            if(instance->last_data.error != HidDeviceNfcErrorNone) {
+                                FURI_LOG_I(TAG, "Type 4 NDEF parsing failed, will output UID only");
+                            }
                             instance->last_data.error = HidDeviceNfcErrorNone;
-                            FURI_LOG_I(TAG, "Got ISO14443-4A UID, len: %d", instance->last_data.uid_len);
                         }
+                        // If parse_ndef is true (NDEF mode), keep the error as-is
+
                         instance->state = HidDeviceNfcStateSuccess;
                     }
                 } else {
@@ -449,15 +867,24 @@ static void hid_device_nfc_scanner_callback(NfcScannerEvent event, void* context
     HidDeviceNfc* instance = context;
 
     if(event.type == NfcScannerEventTypeDetected) {
-        FURI_LOG_I(TAG, "NFC tag detected, protocols: %zu", event.data.protocol_num);
+        FURI_LOG_I(TAG, "========== NFC TAG DETECTED ==========");
+        FURI_LOG_I(TAG, "NFC tag detected, number of protocols: %zu", event.data.protocol_num);
 
         // Select best protocol in priority order (NDEF capability is handled in callbacks)
         // Priority: MfUltralight > ISO14443-4A > ISO15693 > ISO14443-3A
         NfcProtocol protocol_to_use = NfcProtocolInvalid;
 
-        // Log all detected protocols
+        // Log all detected protocols with names
         for(size_t i = 0; i < event.data.protocol_num; i++) {
-            FURI_LOG_I(TAG, "  Protocol %zu: %d", i, event.data.protocols[i]);
+            const char* proto_name = "Unknown";
+            switch(event.data.protocols[i]) {
+                case NfcProtocolIso14443_3a: proto_name = "ISO14443-3A"; break;
+                case NfcProtocolIso14443_4a: proto_name = "ISO14443-4A (ISO-DEP)"; break;
+                case NfcProtocolMfUltralight: proto_name = "MIFARE Ultralight"; break;
+                case NfcProtocolIso15693_3: proto_name = "ISO15693"; break;
+                default: proto_name = "Other"; break;
+            }
+            FURI_LOG_I(TAG, "  Protocol[%zu]: %d (%s)", i, event.data.protocols[i], proto_name);
         }
 
         // Check for protocols in priority order
@@ -510,9 +937,17 @@ static void hid_device_nfc_scanner_callback(NfcScannerEvent event, void* context
         }
 
         if(protocol_to_use != NfcProtocolInvalid) {
+            const char* proto_name = "Unknown";
+            switch(protocol_to_use) {
+                case NfcProtocolIso14443_3a: proto_name = "ISO14443-3A"; break;
+                case NfcProtocolIso14443_4a: proto_name = "ISO14443-4A (ISO-DEP)"; break;
+                case NfcProtocolMfUltralight: proto_name = "MIFARE Ultralight"; break;
+                case NfcProtocolIso15693_3: proto_name = "ISO15693"; break;
+                default: proto_name = "Other"; break;
+            }
             instance->detected_protocol = protocol_to_use;
             instance->state = HidDeviceNfcStateTagDetected;
-            FURI_LOG_I(TAG, "Selected protocol %d, waiting for poller start", protocol_to_use);
+            FURI_LOG_I(TAG, "*** SELECTED PROTOCOL: %d (%s) ***", protocol_to_use, proto_name);
         } else {
             FURI_LOG_W(TAG, "No supported protocol found");
         }
