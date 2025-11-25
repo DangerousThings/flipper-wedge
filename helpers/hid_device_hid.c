@@ -7,7 +7,7 @@
 
 struct HidDeviceHid {
     // USB HID
-    FuriHalUsbInterface* usb_mode_prev;
+    FuriHalUsbInterface* usb_mode_prev;  // Save previous USB mode for restoration
     bool usb_started;
 
     // Bluetooth HID
@@ -64,6 +64,7 @@ void hid_device_hid_start(HidDeviceHid* instance, bool enable_usb, bool enable_b
     // Start USB HID if requested
     if(enable_usb && !instance->usb_started) {
         FURI_LOG_I(TAG, "Starting USB HID");
+        // Save current USB mode for restoration (like official HID app)
         instance->usb_mode_prev = furi_hal_usb_get_config();
         furi_hal_usb_unlock();
         furi_check(furi_hal_usb_set_config(&usb_hid, NULL) == true);
@@ -123,12 +124,12 @@ void hid_device_hid_stop(HidDeviceHid* instance) {
         instance->bt_connected = false;
     }
 
-    // Stop USB HID - restore previous mode if we changed it
+    // Stop USB HID - restore previous USB mode (like official HID app)
     if(instance->usb_started) {
-        FURI_LOG_I(TAG, "Stopping USB HID");
+        FURI_LOG_I(TAG, "Stopping USB HID, restoring previous USB mode");
+        // Restore to saved previous mode (don't lock - official app doesn't)
         if(instance->usb_mode_prev) {
             furi_hal_usb_set_config(instance->usb_mode_prev, NULL);
-            instance->usb_mode_prev = NULL;
         }
         instance->usb_started = false;
     }

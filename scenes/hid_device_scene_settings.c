@@ -2,6 +2,7 @@
 #include <lib/toolbox/value_index.h>
 
 enum SettingsIndex {
+    SettingsIndexHeader,
     SettingsIndexDelimiter,
     SettingsIndexAppendEnter,
     SettingsIndexUsbDebug,
@@ -113,6 +114,14 @@ static void hid_device_scene_settings_item_callback(void* context, uint32_t inde
 void hid_device_scene_settings_on_enter(void* context) {
     HidDevice* app = context;
     VariableItem* item;
+
+    // Header with branding (non-interactive)
+    item = variable_item_list_add(
+        app->variable_item_list,
+        "dangerousthings.com",
+        0,
+        NULL,
+        app);
 
     // Delimiter selector
     uint8_t delimiter_index = get_delimiter_index(app->delimiter);

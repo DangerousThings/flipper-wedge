@@ -16,6 +16,9 @@ App(
     fap_libs=["ble_profile"],
     fap_icon="icons/hid_device_10px.png",
     fap_icon_assets="icons",
-    fap_category="TOOLS",
+    fap_category="Tools",
     fap_version="1.0",
+    fap_description="Read RFID/NFC tags and type their UIDs as HID keyboard input via USB or Bluetooth. Supports 5 scan modes and NDEF text records.",
+    fap_author="Contactless HID Device Contributors",
+    fap_weburl="https://github.com/dangerousthings/contactless-hid-device",
 )
