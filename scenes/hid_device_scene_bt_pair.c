@@ -45,7 +45,7 @@ static void hid_device_scene_bt_pair_rebuild_widget(HidDevice* app, Widget* widg
         "2. Select 'HID-[name]'");
 
     // Connection status
-    bool bt_connected = hid_device_hid_is_bt_connected(app->hid);
+    bool bt_connected = hid_device_hid_is_bt_connected(hid_device_get_hid(app));
     if(bt_connected) {
         widget_add_string_element(
             widget,

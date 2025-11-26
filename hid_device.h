@@ -19,6 +19,7 @@
 #include "views/hid_device_startscreen.h"
 #include "helpers/hid_device_storage.h"
 #include "helpers/hid_device_hid.h"
+#include "helpers/hid_device_hid_worker.h"
 #include "helpers/hid_device_nfc.h"
 #include "helpers/hid_device_rfid.h"
 #include "helpers/hid_device_format.h"
@@ -56,7 +57,6 @@ typedef enum {
 // Output mode
 typedef enum {
     HidDeviceOutputUsb,      // USB HID only
-    HidDeviceOutputBoth,     // Both USB and BLE HID
     HidDeviceOutputBle,      // Bluetooth LE HID only
     HidDeviceOutputCount,
 } HidDeviceOutput;
@@ -95,8 +95,8 @@ typedef struct {
     TextInput* text_input;
     char text_store[HID_DEVICE_TEXT_STORE_COUNT][HID_DEVICE_TEXT_STORE_SIZE + 1];
 
-    // HID module
-    HidDeviceHid* hid;
+    // HID module (managed by worker thread)
+    HidDeviceHidWorker* hid_worker;
     HidDeviceOutput output_mode;
     bool usb_debug_mode;  // Deprecated: kept for backward compatibility reading only
 
@@ -123,6 +123,11 @@ typedef struct {
     char delimiter[HID_DEVICE_DELIMITER_MAX_LEN];
     bool append_enter;
     HidDeviceVibration vibration_level;
+    bool restart_pending;  // True if output mode changed and restart is required
+
+    // Output mode switching (async to avoid UI thread blocking on bt_profile_start)
+    bool output_switch_pending;
+    HidDeviceOutput output_switch_target;
 
     // Timers
     FuriTimer* timeout_timer;
@@ -139,5 +144,19 @@ typedef enum {
     HidDeviceViewIdNumberInput,
     HidDeviceViewIdSettings,
     HidDeviceViewIdBtPair,
-    HidDeviceViewIdOutputRestart,  // Restart prompt when switching to USB output
+    HidDeviceViewIdOutputRestart,  // Deprecated: no longer used (dynamic switching works)
 } HidDeviceViewId;
+
+/** Switch output mode dynamically (USB <-> BLE)
+ * Stops workers, deinits current HID, switches mode, inits new HID, restarts workers
+ * Like Bad USB's dynamic switching pattern
+ *
+ * @param app HidDevice instance
+ * @param new_mode New output mode to switch to
+ */
+void hid_device_switch_output_mode(HidDevice* app, HidDeviceOutput new_mode);
+
+/** Get HID instance from worker
+ * Helper macro to access HID interface managed by worker thread
+ */
+#define hid_device_get_hid(app) hid_device_hid_worker_get_hid((app)->hid_worker)

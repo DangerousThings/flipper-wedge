@@ -3,8 +3,28 @@
 
 void hid_device_play_happy_bump(void* context) {
     HidDevice* app = context;
+
+    // Get vibration duration based on setting
+    uint32_t duration_ms;
+    switch(app->vibration_level) {
+        case HidDeviceVibrationOff:
+            return;  // No vibration
+        case HidDeviceVibrationLow:
+            duration_ms = 30;
+            break;
+        case HidDeviceVibrationMedium:
+            duration_ms = 60;
+            break;
+        case HidDeviceVibrationHigh:
+            duration_ms = 100;
+            break;
+        default:
+            duration_ms = 30;  // Default to low
+            break;
+    }
+
     notification_message(app->notification, &sequence_set_vibro_on);
-    furi_thread_flags_wait(0, FuriFlagWaitAny, 20);
+    furi_thread_flags_wait(0, FuriFlagWaitAny, duration_ms);
     notification_message(app->notification, &sequence_reset_vibro);
 }
 

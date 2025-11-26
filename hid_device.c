@@ -1,4 +1,5 @@
 #include "hid_device.h"
+#include "helpers/hid_device_debug.h"
 
 bool hid_device_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
@@ -9,6 +10,18 @@ bool hid_device_custom_event_callback(void* context, uint32_t event) {
 void hid_device_tick_event_callback(void* context) {
     furi_assert(context);
     HidDevice* app = context;
+
+    // Handle pending output mode switch (async to avoid blocking UI thread)
+    if(app->output_switch_pending) {
+        FURI_LOG_I(TAG, "Tick: Processing pending output mode switch");
+        hid_device_debug_log(TAG, "Tick callback executing deferred mode switch");
+
+        hid_device_switch_output_mode(app, app->output_switch_target);
+        app->output_switch_pending = false;
+
+        hid_device_debug_log(TAG, "Deferred mode switch complete");
+    }
+
     scene_manager_handle_tick_event(app->scene_manager);
 }
 
@@ -21,6 +34,11 @@ bool hid_device_navigation_event_callback(void* context) {
 
 HidDevice* hid_device_app_alloc() {
     HidDevice* app = malloc(sizeof(HidDevice));
+
+    // Initialize debug logging to SD card
+    hid_device_debug_init();
+    hid_device_debug_log("App", "=== APP STARTING ===");
+
     app->gui = furi_record_open(RECORD_GUI);
     app->notification = furi_record_open(RECORD_NOTIFICATION);
 
@@ -41,14 +59,19 @@ HidDevice* hid_device_app_alloc() {
     app->submenu = submenu_alloc();
 
     // Set defaults
-    app->bt_enabled = true;
-    app->usb_debug_mode = false;  // USB HID enabled by default
+    app->output_mode = HidDeviceOutputUsb;  // Default: USB HID
+    app->usb_debug_mode = false;  // Deprecated: kept for backward compatibility
 
     // Scanning defaults
     app->mode = HidDeviceModeNfc;  // Default: NFC only
+    app->mode_startup_behavior = HidDeviceModeStartupRemember;  // Default: Remember last mode
     app->scan_state = HidDeviceScanStateIdle;
     app->delimiter[0] = '\0';  // Empty delimiter by default
     app->append_enter = true;
+    app->vibration_level = HidDeviceVibrationMedium;  // Default: Medium vibration
+    app->restart_pending = false;  // Deprecated field, no longer used
+    app->output_switch_pending = false;
+    app->output_switch_target = HidDeviceOutputUsb;
 
     // Clear scanned data
     app->nfc_uid_len = 0;
@@ -60,14 +83,18 @@ HidDevice* hid_device_app_alloc() {
     app->dialogs = furi_record_open(RECORD_DIALOGS);
     app->file_path = furi_string_alloc();
 
-    // Load configs BEFORE starting HID (so we respect bt_enabled setting)
+    // Load configs BEFORE initializing HID (so we respect output_mode setting)
     hid_device_read_settings(app);
 
-    // Allocate and start HID module with loaded settings
-    // USB HID disabled if USB debug mode is enabled (for CLI access)
-    bool usb_hid_enabled = !app->usb_debug_mode;
-    app->hid = hid_device_hid_alloc();
-    hid_device_hid_start(app->hid, usb_hid_enabled, app->bt_enabled);
+    // Allocate HID worker (manages HID interface in separate thread)
+    app->hid_worker = hid_device_hid_worker_alloc();
+
+    // Start HID worker with loaded output mode (like Bad USB pattern)
+    hid_device_debug_log("App", "Starting HID worker in %s mode",
+                        app->output_mode == HidDeviceOutputUsb ? "USB" : "BLE");
+    HidDeviceHidWorkerMode worker_mode = (app->output_mode == HidDeviceOutputUsb) ?
+        HidDeviceHidWorkerModeUsb : HidDeviceHidWorkerModeBle;
+    hid_device_hid_worker_start(app->hid_worker, worker_mode);
 
     // Allocate NFC module
     app->nfc = hid_device_nfc_alloc();
@@ -110,6 +137,75 @@ HidDevice* hid_device_app_alloc() {
     return app;
 }
 
+void hid_device_switch_output_mode(HidDevice* app, HidDeviceOutput new_mode) {
+    furi_assert(app);
+
+    if(new_mode == app->output_mode) {
+        FURI_LOG_I(TAG, "Already in mode %d, no switch needed", new_mode);
+        return;
+    }
+
+    FURI_LOG_I(TAG, "Switching output mode: %d -> %d", app->output_mode, new_mode);
+    hid_device_debug_log(TAG, "=== OUTPUT MODE SWITCH: %d -> %d ===",
+                        app->output_mode, new_mode);
+
+    // STEP 1: Stop all workers (NFC/RFID)
+    hid_device_debug_log(TAG, "Step 1: Stopping NFC/RFID workers");
+    bool nfc_was_scanning = hid_device_nfc_is_scanning(app->nfc);
+    bool rfid_was_scanning = hid_device_rfid_is_scanning(app->rfid);
+    bool parse_ndef = (app->mode == HidDeviceModeNdef);
+
+    if(nfc_was_scanning) {
+        hid_device_nfc_stop(app->nfc);
+        hid_device_debug_log(TAG, "NFC stopped");
+    }
+    if(rfid_was_scanning) {
+        hid_device_rfid_stop(app->rfid);
+        hid_device_debug_log(TAG, "RFID stopped");
+    }
+
+    // STEP 2: Stop HID worker (deinits HID in worker thread, waits for exit)
+    hid_device_debug_log(TAG, "Step 2: Stopping HID worker (old mode=%s)",
+                        app->output_mode == HidDeviceOutputUsb ? "USB" : "BLE");
+    hid_device_hid_worker_stop(app->hid_worker);
+    hid_device_debug_log(TAG, "HID worker stopped");
+
+    // STEP 3: Small delay between modes (safety buffer)
+    hid_device_debug_log(TAG, "Step 3: Waiting 300ms before starting new mode");
+    furi_delay_ms(300);
+
+    // STEP 4: Switch mode
+    hid_device_debug_log(TAG, "Step 4: Switching mode");
+    app->output_mode = new_mode;
+
+    // STEP 5: Start HID worker with new mode (inits HID in worker thread)
+    hid_device_debug_log(TAG, "Step 5: Starting HID worker (new mode=%s)",
+                        new_mode == HidDeviceOutputUsb ? "USB" : "BLE");
+    HidDeviceHidWorkerMode worker_mode = (new_mode == HidDeviceOutputUsb) ?
+        HidDeviceHidWorkerModeUsb : HidDeviceHidWorkerModeBle;
+    hid_device_hid_worker_start(app->hid_worker, worker_mode);
+    hid_device_debug_log(TAG, "HID worker started");
+
+    // STEP 6: Restart NFC/RFID workers if they were running
+    hid_device_debug_log(TAG, "Step 6: Restarting NFC/RFID workers (NFC=%d, RFID=%d)",
+                        nfc_was_scanning, rfid_was_scanning);
+    if(nfc_was_scanning) {
+        hid_device_nfc_start(app->nfc, parse_ndef);
+        hid_device_debug_log(TAG, "NFC restarted");
+    }
+    if(rfid_was_scanning) {
+        hid_device_rfid_start(app->rfid);
+        hid_device_debug_log(TAG, "RFID restarted");
+    }
+
+    // STEP 7: Save settings to persist the change
+    hid_device_debug_log(TAG, "Step 7: Saving settings");
+    hid_device_save_settings(app);
+
+    FURI_LOG_I(TAG, "Output mode switch complete");
+    hid_device_debug_log(TAG, "=== OUTPUT MODE SWITCH COMPLETE ===");
+}
+
 void hid_device_app_free(HidDevice* app) {
     furi_assert(app);
 
@@ -135,8 +231,8 @@ void hid_device_app_free(HidDevice* app) {
         app->nfc = NULL;
     }
 
-    // Free HID module
-    hid_device_hid_free(app->hid);
+    // Free HID worker (stops thread and cleans up HID)
+    hid_device_hid_worker_free(app->hid_worker);
 
     // Scene manager
     scene_manager_free(app->scene_manager);
@@ -166,6 +262,10 @@ void hid_device_app_free(HidDevice* app) {
     // Close File Browser
     furi_record_close(RECORD_DIALOGS);
     furi_string_free(app->file_path);
+
+    // Close debug logging
+    hid_device_debug_log("App", "=== APP EXITING ===");
+    hid_device_debug_close();
 
     //Remove whatever is left
     free(app);

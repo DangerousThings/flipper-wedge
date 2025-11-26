@@ -119,8 +119,8 @@ static void hid_device_scene_startscreen_rfid_callback(HidDeviceRfidData* data, 
 }
 
 static void hid_device_scene_startscreen_update_status(HidDevice* app) {
-    bool usb_connected = hid_device_hid_is_usb_connected(app->hid);
-    bool bt_connected = hid_device_hid_is_bt_connected(app->hid);
+    bool usb_connected = hid_device_hid_is_usb_connected(hid_device_get_hid(app));
+    bool bt_connected = hid_device_hid_is_bt_connected(hid_device_get_hid(app));
     hid_device_startscreen_set_connected_status(
         app->hid_device_startscreen, usb_connected, bt_connected);
 }
@@ -154,10 +154,10 @@ static void hid_device_scene_startscreen_output_and_reset(HidDevice* app) {
     hid_device_startscreen_set_display_state(app->hid_device_startscreen, HidDeviceDisplayStateResult);
 
     // Type the output via HID
-    if(hid_device_hid_is_connected(app->hid)) {
-        hid_device_hid_type_string(app->hid, app->output_buffer);
+    if(hid_device_hid_is_connected(hid_device_get_hid(app))) {
+        hid_device_hid_type_string(hid_device_get_hid(app), app->output_buffer);
         if(app->append_enter) {
-            hid_device_hid_press_enter(app->hid);
+            hid_device_hid_press_enter(hid_device_get_hid(app));
         }
     }
 
@@ -188,7 +188,7 @@ static void hid_device_scene_startscreen_output_and_reset(HidDevice* app) {
 
 static void hid_device_scene_startscreen_start_scanning(HidDevice* app) {
     // Don't scan if no HID connection
-    if(!hid_device_hid_is_connected(app->hid)) {
+    if(!hid_device_hid_is_connected(hid_device_get_hid(app))) {
         FURI_LOG_D("HidDeviceScene", "start_scanning: no HID connection, skipping");
         return;
     }
@@ -428,7 +428,7 @@ bool hid_device_scene_startscreen_on_event(void* context, SceneManagerEvent even
         hid_device_nfc_tick(app->nfc);
 
         // Check if we should start/stop scanning based on HID connection
-        bool connected = hid_device_hid_is_connected(app->hid);
+        bool connected = hid_device_hid_is_connected(hid_device_get_hid(app));
         if(connected && app->scan_state == HidDeviceScanStateIdle) {
             hid_device_scene_startscreen_start_scanning(app);
         } else if(!connected && app->scan_state != HidDeviceScanStateIdle) {

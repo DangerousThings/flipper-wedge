@@ -35,9 +35,8 @@ const char* const mode_startup_text[6] = {
 };
 
 // Output mode options
-const char* const output_text[3] = {
+const char* const output_text[2] = {
     "USB",
-    "Both",
     "BLE",
 };
 
@@ -120,35 +119,17 @@ static void hid_device_scene_settings_set_output(VariableItem* item) {
     variable_item_set_current_value_text(item, output_text[index]);
     HidDeviceOutput new_output_mode = (HidDeviceOutput)index;
 
-    // Handle output mode change
+    // Handle output mode change with DEFERRED switching
     if(new_output_mode != app->output_mode) {
-        bool old_usb_enabled = (app->output_mode == HidDeviceOutputUsb || app->output_mode == HidDeviceOutputBoth);
-        bool new_usb_enabled = (new_output_mode == HidDeviceOutputUsb || new_output_mode == HidDeviceOutputBoth);
-        bool old_bt_enabled = (app->output_mode == HidDeviceOutputBle || app->output_mode == HidDeviceOutputBoth);
-        bool new_bt_enabled = (new_output_mode == HidDeviceOutputBle || new_output_mode == HidDeviceOutputBoth);
+        FURI_LOG_I("Settings", "Requesting output mode switch: %s -> %s",
+                   app->output_mode == HidDeviceOutputUsb ? "USB" : "BLE",
+                   new_output_mode == HidDeviceOutputUsb ? "USB" : "BLE");
 
-        // Check if USB status changed (requires app restart)
-        // USB can't be dynamically enabled/disabled without restarting the app
-        if(old_usb_enabled != new_usb_enabled) {
-            // Save the new setting first
-            app->output_mode = new_output_mode;
-            hid_device_save_settings(app);
-
-            // Show restart prompt
-            scene_manager_next_scene(app->scene_manager, HidDeviceSceneUsbDebugRestart);
-            return;  // Don't rebuild settings list yet
-        }
-
-        app->output_mode = new_output_mode;
-
-        // Start/stop BLE HID if needed (when not requiring restart)
-        if(new_bt_enabled && !old_bt_enabled) {
-            // Enable BT - start HID
-            hid_device_hid_start_bt(app->hid);
-        } else if(!new_bt_enabled && old_bt_enabled) {
-            // Disable BT - stop HID
-            hid_device_hid_stop_bt(app->hid);
-        }
+        // Set flag for tick callback to process (worker thread handles HID lifecycle)
+        app->output_switch_pending = true;
+        app->output_switch_target = new_output_mode;
+        // DON'T update app->output_mode here - let hid_device_switch_output_mode() do it
+        // after the actual switch completes (otherwise switch function thinks we're already there)
 
         // Rebuild settings list to show/hide "Pair Bluetooth..." option
         scene_manager_handle_custom_event(app->scene_manager, SettingsIndexOutput);
@@ -167,6 +148,13 @@ void hid_device_scene_settings_on_enter(void* context) {
     // Keep display backlight on while in settings
     notification_message(app->notification, &sequence_display_backlight_enforce_on);
 
+    // CRITICAL: Validate output_mode is within range (fix corrupted settings)
+    if(app->output_mode >= HidDeviceOutputCount) {
+        FURI_LOG_E("Settings", "Output mode %d out of range, forcing to USB", app->output_mode);
+        app->output_mode = HidDeviceOutputUsb;
+        hid_device_save_settings(app);  // Save the fix
+    }
+
     // Header with branding (non-interactive)
     item = variable_item_list_add(
         app->variable_item_list,
@@ -182,15 +170,39 @@ void hid_device_scene_settings_on_enter(void* context) {
         HidDeviceOutputCount,
         hid_device_scene_settings_set_output,
         app);
-    variable_item_set_current_value_index(item, app->output_mode);
-    variable_item_set_current_value_text(item, output_text[app->output_mode]);
 
-    // Pair Bluetooth... action (only if output mode includes BLE)
-    bool bt_enabled = (app->output_mode == HidDeviceOutputBle || app->output_mode == HidDeviceOutputBoth);
-    if(bt_enabled) {
-        // Get BT connection status to show in label
-        bool bt_connected = hid_device_hid_is_bt_connected(app->hid);
-        const char* bt_status = bt_connected ? "Connected" : "Not paired";
+    // Use target mode for display if switching is pending (prevents duplicate positions)
+    HidDeviceOutput display_mode = app->output_switch_pending ?
+        app->output_switch_target : app->output_mode;
+
+    variable_item_set_current_value_index(item, display_mode);
+    variable_item_set_current_value_text(item, output_text[display_mode]);
+
+    // Pair Bluetooth... action (show in BLE mode or when switching to BLE)
+    // Hide immediately when switching from BLE to USB for cleaner UX
+    bool currently_ble = (app->output_mode == HidDeviceOutputBle);
+    bool switching_to_ble = (app->output_switch_pending && app->output_switch_target == HidDeviceOutputBle);
+    bool switching_from_ble = (app->output_switch_pending && app->output_mode == HidDeviceOutputBle);
+
+    // Only show if in BLE mode or switching TO BLE (not FROM BLE)
+    if((currently_ble || switching_to_ble) && !switching_from_ble) {
+        const char* bt_status;
+
+        // Determine status based on state
+        if(switching_to_ble) {
+            // Switching USB → BLE: Show "Initializing..." while starting BLE
+            bt_status = "Initializing...";
+        } else {
+            // Normal BLE mode: Show connection status
+            bool bt_connected = hid_device_hid_is_bt_connected(hid_device_get_hid(app));
+            if(bt_connected) {
+                bt_status = "Paired";
+            } else {
+                // Check if advertising (pairing mode)
+                bool bt_advertising = furi_hal_bt_is_active();
+                bt_status = bt_advertising ? "Pairing..." : "Not paired";
+            }
+        }
 
         item = variable_item_list_add(
             app->variable_item_list,
@@ -266,6 +278,64 @@ bool hid_device_scene_settings_on_event(void* context, SceneManagerEvent event) 
             scene_manager_next_scene(app->scene_manager, HidDeviceSceneBtPair);
             consumed = true;
         }
+    } else if(event.type == SceneManagerEventTypeTick) {
+        // Periodically check if BT connection status changed or if switching modes
+        static bool last_bt_connected = false;
+        static bool last_bt_advertising = false;
+        static bool last_switching_pending = false;
+        static HidDeviceOutput last_output_mode = HidDeviceOutputUsb;
+        static uint8_t tick_counter = 0;
+
+        // Check more frequently during/after transitions (every 2 ticks = 200ms)
+        // Check less frequently when stable (every 10 ticks = 1 second)
+        bool was_switching = last_switching_pending;
+        bool in_transition = app->output_switch_pending || was_switching;
+        uint8_t check_interval = in_transition ? 2 : 10;
+
+        tick_counter++;
+        if(tick_counter >= check_interval) {
+            tick_counter = 0;
+
+            bool currently_ble = (app->output_mode == HidDeviceOutputBle);
+            bool switching = app->output_switch_pending;
+
+            // Check if we need to rebuild the list
+            bool needs_rebuild = false;
+
+            // Always rebuild if switching state changed
+            if(switching != last_switching_pending) {
+                needs_rebuild = true;
+                last_switching_pending = switching;
+                FURI_LOG_I("Settings", "Switching state changed: %d -> %d", !switching, switching);
+            }
+
+            // Rebuild if output mode actually changed (switch completed)
+            if(app->output_mode != last_output_mode) {
+                needs_rebuild = true;
+                last_output_mode = app->output_mode;
+                FURI_LOG_I("Settings", "Output mode changed: %d -> %d", last_output_mode, app->output_mode);
+            }
+
+            // Check BT status changes when in BLE mode or switching
+            if(currently_ble || switching) {
+                bool bt_connected = hid_device_hid_is_bt_connected(hid_device_get_hid(app));
+                bool bt_advertising = furi_hal_bt_is_active();
+
+                if(bt_connected != last_bt_connected || bt_advertising != last_bt_advertising) {
+                    needs_rebuild = true;
+                    last_bt_connected = bt_connected;
+                    last_bt_advertising = bt_advertising;
+                }
+            }
+
+            // Rebuild if needed
+            if(needs_rebuild) {
+                FURI_LOG_I("Settings", "Status changed, rebuilding list");
+                variable_item_list_reset(app->variable_item_list);
+                hid_device_scene_settings_on_enter(context);
+            }
+        }
+        consumed = true;
     } else if(event.type == SceneManagerEventTypeBack) {
         // Save settings when leaving
         hid_device_save_settings(app);
