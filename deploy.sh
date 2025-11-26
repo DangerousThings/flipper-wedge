@@ -2,10 +2,160 @@
 # Build and deploy Contactless HID Device to connected Flipper
 
 APP_NAME="contactless_hid_device"
-APP_DIR="/home/work/contactless hid reader"
+APP_DIR="/home/work/contactless hid device"
 
-# Default to official firmware
-FIRMWARE=${1:-official}
+# Default values
+FIRMWARE="official"
+BRANCH="release"
+TAG=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --branch)
+            BRANCH="$2"
+            shift 2
+            ;;
+        --tag)
+            TAG="$2"
+            shift 2
+            ;;
+        official|ofw|unleashed|ul|momentum|mntm|xtreme|xfw|roguemaster|rm)
+            FIRMWARE="$1"
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            echo ""
+            echo "Usage: $0 [firmware] [--branch BRANCH] [--tag TAG]"
+            echo ""
+            echo "Firmware options:"
+            echo "  official:     ofw"
+            echo "  unleashed:    ul"
+            echo "  momentum:     mntm, xtreme, xfw"
+            echo "  roguemaster:  rm"
+            echo ""
+            echo "Flags:"
+            echo "  --branch BRANCH  Git branch to checkout (default: release)"
+            echo "  --tag TAG        Git tag to checkout (overrides --branch)"
+            echo ""
+            echo "Examples:"
+            echo "  $0 official"
+            echo "  $0 official --branch dev"
+            echo "  $0 official --tag 1.2.3"
+            exit 1
+            ;;
+    esac
+done
+
+# Git checkout function with version change detection
+checkout_firmware_version() {
+    local fw_path=$1
+    local branch=$2
+    local tag=$3
+    local fw_name=$4
+
+    echo "📥 Fetching firmware updates..."
+    cd "$fw_path"
+
+    # Store current state
+    local current_ref=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || git rev-parse --short HEAD)
+
+    # Fetch latest
+    git fetch --all --tags --quiet
+
+    # Determine target
+    if [ -n "$tag" ]; then
+        target="tags/$tag"
+        target_name="tag $tag"
+    else
+        target="origin/$branch"
+        target_name="branch $branch"
+    fi
+
+    # Validate target exists
+    if ! git rev-parse --verify "$target" >/dev/null 2>&1; then
+        echo "❌ Error: $target_name not found in ${fw_name} firmware"
+        exit 1
+    fi
+
+    # Checkout
+    git checkout "$target" --quiet
+
+    # Detect change and alert
+    local new_ref=$(git rev-parse --short HEAD)
+    local old_commit=$(git rev-parse "$current_ref" 2>/dev/null || echo "unknown")
+    local new_commit=$(git rev-parse HEAD)
+
+    if [ "$old_commit" != "$new_commit" ]; then
+        echo -e "\033[0;31m⚠️  FIRMWARE VERSION CHANGED: $current_ref → $target_name ($(git rev-parse --short HEAD))\033[0m"
+    fi
+
+    # Update submodules
+    echo "🔄 Updating submodules..."
+    git submodule update --init --recursive --quiet
+}
+
+# Verify Flipper firmware matches target
+verify_flipper_firmware() {
+    local fw_path=$1
+    local target_fw=$2
+    local target_fw_name=$3
+    local target_branch=$4
+    local target_tag=$5
+
+    echo "🔍 Checking Flipper firmware..."
+    cd "$fw_path"
+
+    # Get current build git hash
+    local build_hash=$(git rev-parse --short=8 HEAD)
+    local build_ref=$(git describe --tags --always)
+    local build_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    echo "   Building from: $build_ref ($build_hash)"
+    if [ -n "$target_tag" ]; then
+        echo "   Target: tag $target_tag"
+    elif [ -n "$target_branch" ]; then
+        echo "   Target: branch $target_branch"
+    fi
+
+    # Try to detect device firmware (best effort - may fail if device busy/disconnected)
+    echo ""
+    echo "   Attempting to detect Flipper firmware..."
+    echo "   (This may take a few seconds or fail if Flipper is busy)"
+    echo ""
+
+    # Try simple device check
+    if ! timeout 3 test -e /dev/ttyACM0 2>/dev/null; then
+        echo "⚠️  Warning: Flipper not detected on /dev/ttyACM0"
+        echo ""
+        read -p "Continue anyway? [y/N]: " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Aborted."
+            exit 1
+        fi
+        return
+    fi
+
+    echo "✅ Flipper detected"
+    echo ""
+    echo "⚠️  VERSION MATCHING:"
+    echo "   Your Flipper's firmware version may differ from what you're building for."
+    echo "   If the app crashes, flash the matching firmware with: ./fbt flash_usb"
+    echo ""
+
+    echo "📋 Build information:"
+    echo "   • Firmware: ${target_fw_name}"
+    echo "   • Git hash: $build_hash"
+    echo "   • Git ref: $build_ref"
+    if [ -n "$target_tag" ]; then
+        echo "   • Using tag: $target_tag"
+    elif [ -n "$target_branch" ] && [ "$target_branch" != "release" ]; then
+        echo "   • Using branch: $target_branch"
+    fi
+    echo ""
+}
 
 case $FIRMWARE in
     official|ofw)
@@ -24,10 +174,6 @@ case $FIRMWARE in
         FW_PATH="/home/work/roguemaster-firmware"
         FW_NAME="RogueMaster"
         ;;
-    *)
-        echo "Usage: $0 [official|unleashed|momentum|roguemaster]"
-        exit 1
-        ;;
 esac
 
 if [ ! -d "$FW_PATH" ]; then
@@ -41,9 +187,71 @@ if [ ! -L "${FW_PATH}/applications_user/${APP_NAME}" ]; then
     ln -s "${APP_DIR}" "${FW_PATH}/applications_user/${APP_NAME}"
 fi
 
-echo "🔨 Building and deploying ${APP_NAME} for ${FW_NAME} firmware..."
+# Checkout requested firmware version
+checkout_firmware_version "$FW_PATH" "$BRANCH" "$TAG" "$FW_NAME"
+
+echo ""
+
+# Verify Flipper firmware matches
+FIRMWARE_LOWER=$(echo "$FIRMWARE" | tr '[:upper:]' '[:lower:]')
+case $FIRMWARE_LOWER in
+    ofw) FIRMWARE_LOWER="official" ;;
+    ul) FIRMWARE_LOWER="unleashed" ;;
+    mntm|xtreme|xfw) FIRMWARE_LOWER="momentum" ;;
+    rm) FIRMWARE_LOWER="roguemaster" ;;
+esac
+verify_flipper_firmware "$FW_PATH" "$FIRMWARE_LOWER" "$FW_NAME" "$BRANCH" "$TAG"
+
+echo ""
+echo "🔨 Building ${APP_NAME} for ${FW_NAME} firmware..."
 cd "${FW_PATH}"
-./fbt launch APPSRC=applications_user/${APP_NAME}
+./fbt fap_${APP_NAME}
+
+# Determine version tag for output directory
+if [ -n "$TAG" ]; then
+    VERSION_DIR="$TAG"
+else
+    VERSION_DIR="$BRANCH"
+fi
+
+# Create output directory structure
+OUTPUT_DIR="${APP_DIR}/dist/${FIRMWARE}/${VERSION_DIR}"
+mkdir -p "${OUTPUT_DIR}"
+
+# Dynamically find the FAP file in the build directory
+# Build directories can be f7-firmware-C (compact), f7-firmware-D (debug), etc.
+SOURCE_FAP=""
+for build_dir in "${FW_PATH}/build/f7-firmware-"*; do
+    if [ -d "$build_dir" ]; then
+        candidate="${build_dir}/.extapps/${APP_NAME}.fap"
+        if [ -f "$candidate" ]; then
+            SOURCE_FAP="$candidate"
+            break
+        fi
+    fi
+done
+
+DEST_FAP="${OUTPUT_DIR}/${APP_NAME}.fap"
+
+if [ -n "$SOURCE_FAP" ] && [ -f "$SOURCE_FAP" ]; then
+    cp "$SOURCE_FAP" "$DEST_FAP"
+    echo "📦 FAP saved to: ${DEST_FAP}"
+    echo "   (Found at: ${SOURCE_FAP})"
+else
+    echo "❌ Error: Build succeeded but FAP not found in ${FW_PATH}/build/f7-firmware-*/.extapps/"
+    echo "   Searched directories:"
+    ls -d "${FW_PATH}/build/f7-firmware-"* 2>/dev/null || echo "   No build directories found"
+    exit 1
+fi
+
+echo ""
+echo "📤 Deploying to Flipper..."
+cd "${FW_PATH}"
+
+# Use fbt's built-in launch command (uploads and starts the app)
+echo "Uploading and launching app..."
+timeout 120 ./fbt launch APPSRC=applications_user/${APP_NAME}
 
 echo ""
 echo "✅ Deployed to Flipper!"
+echo "   The app should now be running on your Flipper."

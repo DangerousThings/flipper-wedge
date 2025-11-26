@@ -55,10 +55,13 @@ void hid_device_save_settings(void* context) {
         fff_file, HID_DEVICE_SETTINGS_KEY_APPEND_ENTER, &app->append_enter, 1);
     uint32_t mode = app->mode;
     flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE, &mode, 1);
-    flipper_format_write_bool(
-        fff_file, HID_DEVICE_SETTINGS_KEY_BT_ENABLED, &app->bt_enabled, 1);
-    flipper_format_write_bool(
-        fff_file, HID_DEVICE_SETTINGS_KEY_USB_DEBUG, &app->usb_debug_mode, 1);
+    uint32_t mode_startup = app->mode_startup_behavior;
+    flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE_STARTUP, &mode_startup, 1);
+    uint32_t output_mode = app->output_mode;
+    flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_OUTPUT_MODE, &output_mode, 1);
+    // Note: USB Debug Mode no longer saved (deprecated in favor of Output selector)
+    uint32_t vibration = app->vibration_level;
+    flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_VIBRATION, &vibration, 1);
 
     if(!flipper_format_rewind(fff_file)) {
         hid_device_close_config_file(fff_file);
@@ -119,24 +122,91 @@ void hid_device_read_settings(void* context) {
     flipper_format_read_bool(
         fff_file, HID_DEVICE_SETTINGS_KEY_APPEND_ENTER, &app->append_enter, 1);
 
-    uint32_t mode = HidDeviceModeNfc;  // Default to NFC mode
-    if(flipper_format_read_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE, &mode, 1)) {
-        // Validate mode is within valid range
-        if(mode < HidDeviceModeCount) {
-            app->mode = mode;
+    uint32_t saved_mode = HidDeviceModeNfc;  // Default to NFC mode
+    flipper_format_read_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE, &saved_mode, 1);
+
+    // Read mode startup behavior (default to Remember)
+    uint32_t mode_startup = HidDeviceModeStartupRemember;
+    if(flipper_format_read_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE_STARTUP, &mode_startup, 1)) {
+        // Validate mode startup is within valid range
+        if(mode_startup < HidDeviceModeStartupCount) {
+            app->mode_startup_behavior = (HidDeviceModeStartup)mode_startup;
         }
     }
 
-    // Read BT enabled setting (default to true for backward compatibility)
-    bool bt_enabled = true;
-    if(flipper_format_read_bool(fff_file, HID_DEVICE_SETTINGS_KEY_BT_ENABLED, &bt_enabled, 1)) {
-        app->bt_enabled = bt_enabled;
+    // Apply mode startup behavior logic
+    if(app->mode_startup_behavior == HidDeviceModeStartupRemember) {
+        // Use saved mode (if valid)
+        if(saved_mode < HidDeviceModeCount) {
+            app->mode = (HidDeviceMode)saved_mode;
+        }
+    } else {
+        // Use default mode based on startup behavior
+        switch(app->mode_startup_behavior) {
+            case HidDeviceModeStartupDefaultNfc:
+                app->mode = HidDeviceModeNfc;
+                break;
+            case HidDeviceModeStartupDefaultRfid:
+                app->mode = HidDeviceModeRfid;
+                break;
+            case HidDeviceModeStartupDefaultNdef:
+                app->mode = HidDeviceModeNdef;
+                break;
+            case HidDeviceModeStartupDefaultNfcRfid:
+                app->mode = HidDeviceModeNfcThenRfid;
+                break;
+            case HidDeviceModeStartupDefaultRfidNfc:
+                app->mode = HidDeviceModeRfidThenNfc;
+                break;
+            default:
+                app->mode = HidDeviceModeNfc;
+                break;
+        }
     }
 
-    // Read USB debug mode setting (default to false)
+    // Read output mode setting (default to USB)
+    // Note: We removed "Both" mode. Old settings migration:
+    // Old 0 (USB) -> New 0 (USB)
+    // Old 1 (Both) -> New 0 (USB) - default to USB for backward compat
+    // Old 2 (BLE) -> New 1 (BLE)
+    uint32_t output_mode = HidDeviceOutputUsb;  // Default to USB
+    if(flipper_format_read_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_OUTPUT_MODE, &output_mode, 1)) {
+        // Migrate old "Both" (1) to USB, old BLE (2) to new BLE (1)
+        if(output_mode == 0) {
+            // Old USB -> New USB
+            app->output_mode = HidDeviceOutputUsb;
+        } else if(output_mode == 1) {
+            // Old "Both" -> New USB (safer default)
+            app->output_mode = HidDeviceOutputUsb;
+        } else if(output_mode == 2) {
+            // Old BLE -> New BLE (now index 1)
+            app->output_mode = HidDeviceOutputBle;
+        } else {
+            // Invalid value - default to USB
+            FURI_LOG_W(TAG, "Invalid output mode %lu, defaulting to USB", output_mode);
+            app->output_mode = HidDeviceOutputUsb;
+        }
+    }
+
+    // Final validation: ensure output_mode is within valid range
+    if(app->output_mode >= HidDeviceOutputCount) {
+        FURI_LOG_E(TAG, "Output mode %d out of range, forcing to USB", app->output_mode);
+        app->output_mode = HidDeviceOutputUsb;
+    }
+
+    // Read USB debug mode setting (backward compatibility only - no longer used)
+    // Old configs may have this setting; we read it to avoid errors but don't apply it
     bool usb_debug = false;
-    if(flipper_format_read_bool(fff_file, HID_DEVICE_SETTINGS_KEY_USB_DEBUG, &usb_debug, 1)) {
-        app->usb_debug_mode = usb_debug;
+    flipper_format_read_bool(fff_file, HID_DEVICE_SETTINGS_KEY_USB_DEBUG, &usb_debug, 1);
+    // Note: usb_debug_mode is deprecated; Output selector (USB/BLE/Both) replaces this functionality
+
+    // Read vibration level setting (default to Medium for backward compatibility)
+    uint32_t vibration = HidDeviceVibrationMedium;
+    if(flipper_format_read_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_VIBRATION, &vibration, 1)) {
+        // Validate vibration level is within valid range
+        if(vibration < HidDeviceVibrationCount) {
+            app->vibration_level = (HidDeviceVibration)vibration;
+        }
     }
 
     flipper_format_rewind(fff_file);

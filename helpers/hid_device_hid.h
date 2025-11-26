@@ -25,31 +25,33 @@ HidDeviceHid* hid_device_hid_alloc(void);
  */
 void hid_device_hid_free(HidDeviceHid* instance);
 
-/** Start HID services (USB and/or BT)
+/** Initialize USB HID interface
+ * Like Bad USB pattern - call at app start or when switching to USB mode
  *
  * @param instance HidDeviceHid instance
- * @param enable_usb Enable USB HID (disable for serial debugging)
- * @param enable_bt Enable Bluetooth HID
  */
-void hid_device_hid_start(HidDeviceHid* instance, bool enable_usb, bool enable_bt);
+void hid_device_hid_init_usb(HidDeviceHid* instance);
 
-/** Stop HID services
+/** Deinitialize USB HID interface
+ * Like Bad USB pattern - call when switching away from USB mode or at app exit
  *
  * @param instance HidDeviceHid instance
  */
-void hid_device_hid_stop(HidDeviceHid* instance);
+void hid_device_hid_deinit_usb(HidDeviceHid* instance);
 
-/** Start only Bluetooth HID (for dynamic enable)
+/** Initialize BLE HID interface
+ * Like Bad USB pattern - call at app start or when switching to BLE mode
  *
  * @param instance HidDeviceHid instance
  */
-void hid_device_hid_start_bt(HidDeviceHid* instance);
+void hid_device_hid_init_ble(HidDeviceHid* instance);
 
-/** Stop only Bluetooth HID (for dynamic disable)
+/** Deinitialize BLE HID interface
+ * Like Bad USB pattern - call when switching away from BLE mode or at app exit
  *
  * @param instance HidDeviceHid instance
  */
-void hid_device_hid_stop_bt(HidDeviceHid* instance);
+void hid_device_hid_deinit_ble(HidDeviceHid* instance);
 
 /** Set connection status callback
  *
