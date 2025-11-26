@@ -62,6 +62,7 @@ void hid_device_save_settings(void* context) {
     // Note: USB Debug Mode no longer saved (deprecated in favor of Output selector)
     uint32_t vibration = app->vibration_level;
     flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_VIBRATION, &vibration, 1);
+    flipper_format_write_bool(fff_file, HID_DEVICE_SETTINGS_KEY_LOG_TO_SD, &app->log_to_sd, 1);
 
     if(!flipper_format_rewind(fff_file)) {
         hid_device_close_config_file(fff_file);
@@ -208,6 +209,9 @@ void hid_device_read_settings(void* context) {
             app->vibration_level = (HidDeviceVibration)vibration;
         }
     }
+
+    // Read log to SD setting (default to OFF for privacy/performance)
+    flipper_format_read_bool(fff_file, HID_DEVICE_SETTINGS_KEY_LOG_TO_SD, &app->log_to_sd, 1);
 
     flipper_format_rewind(fff_file);
 

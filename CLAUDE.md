@@ -1,70 +1,673 @@
-# CLAUDE.md - Contactless HID Device Project Guide
+# CLAUDE.md - Contactless HID Device Maintenance Guide
 
-This file provides guidance for developing the Contactless HID Device Flipper Zero application. Follow these guidelines to ensure a well-tested, polished final product.
-
----
-
-## Project Overview
-
-**Goal**: Transform the Flipper Zero into a contactless tag-to-keyboard device that reads RFID/NFC tags and types their UIDs (and optional NDEF data) as HID keyboard input.
-
-**Base Template**: leedave/flipper-zero-fap-boilerplate
-**Target Firmware**: Official Flipper Zero firmware (latest stable)
-**Build System**: Docker-based via `./fbt`
-
-### Core Features
-1. Read RFID (125 kHz) UIDs - EM4100, HID Prox, Indala
-2. Read NFC (13.56 MHz) UIDs - ISO14443A/B, MIFARE, NTAG
-3. Parse NDEF text records from NFC tags (Type 2 NDEF on MF Ultralight/NTAG tags)
-4. Output via USB HID keyboard
-5. Output via Bluetooth HID keyboard
-6. 5 scanning modes (NFC, RFID, NDEF, NFC+RFID, RFID+NFC) + Bluetooth pairing
-7. Configurable delimiter and Enter key append
-
-**Note:** NDEF mode currently supports Type 2 NDEF tags only (MIFARE Ultralight, NTAG series). Type 4 and Type 5 NDEF support can be added in the future.
-
-### Specification Document
-Full requirements are in `contactless_hid_device.md` - reference it for all behavioral details.
+This file provides guidance for **maintaining and stabilizing** the Contactless HID Device Flipper Zero application across multiple firmware versions. The focus is on **preserving functionality, ensuring cross-firmware compatibility, and preventing regressions** as new firmware versions are released.
 
 ---
 
-## Build Environment Setup
+## Project Status
 
-### Initial Setup (Run Once)
+**Current Version**: 1.0 (Feature-Complete)
+**Status**: Active Maintenance
+**Target**: Stability and multi-firmware compatibility
+
+### Core Features (Complete)
+✅ RFID (125 kHz) reading - EM4100, HID Prox, Indala
+✅ NFC (13.56 MHz) reading - ISO14443A/B, MIFARE, NTAG
+✅ NDEF parsing - Type 2, Type 4, Type 5 text records
+✅ USB HID keyboard output
+✅ Bluetooth HID keyboard output
+✅ 5 scanning modes (NFC, RFID, NDEF, NFC+RFID, RFID+NFC)
+✅ Dynamic USB/BLE switching (no app restart required)
+✅ Configurable settings (delimiter, Enter key, output mode, vibration)
+✅ Settings persistence
+✅ Scan logging to SD card
+✅ Haptic/LED/sound feedback
+✅ Mode startup behavior (remember last mode or default)
+
+### Supported Firmwares
+- **Official** (Primary) - flipperzero-firmware
+- **Unleashed** - unleashed-firmware
+- **Momentum** (includes Xtreme) - Momentum-Firmware
+- **RogueMaster** (Secondary) - roguemaster-firmware
+
+---
+
+## Maintenance Philosophy
+
+### Primary Goals
+1. **Stability First**: No new features without explicit user request
+2. **Cross-Firmware Compatibility**: Test on all 4 firmwares before release
+3. **Regression Prevention**: Validate all existing features after any change
+4. **API Compatibility**: Monitor firmware API changes and adapt proactively
+5. **User Experience**: Maintain consistent behavior across firmware versions
+
+### What NOT to Do
+- ❌ Add new features unless explicitly requested
+- ❌ Refactor working code without a clear maintenance benefit
+- ❌ Optimize code that isn't causing problems
+- ❌ Change UX patterns without user feedback
+- ❌ Update firmware dependencies without thorough testing
+
+### When to Make Changes
+- ✅ Firmware API breaks compatibility (required adaptation)
+- ✅ Critical bugs affecting core functionality
+- ✅ Security vulnerabilities
+- ✅ User-reported issues with evidence
+- ✅ Explicitly requested enhancements from maintainers
+
+---
+
+## Build & Deploy Workflows
+
+### Build Scripts Overview
+
+The project includes three build scripts for multi-firmware support:
+
+#### 1. `build.sh` - Build for specific firmware
 ```bash
-# Clone official Flipper Zero firmware (outside this app directory)
-cd /home/work
-git clone --recursive https://github.com/flipperdevices/flipperzero-firmware.git
-cd flipperzero-firmware
+# Usage
+./build.sh [firmware] [--branch BRANCH] [--tag TAG]
 
-# Create symlink for our app
-ln -s "/home/work/contactless hid reader" applications_user/contactless_hid_device
+# Examples
+./build.sh official              # Official firmware (latest stable tag)
+./build.sh unleashed             # Unleashed firmware (release branch)
+./build.sh momentum              # Momentum firmware (release branch)
+./build.sh official --tag 1.3.4  # Specific version
+./build.sh official --branch dev # Development branch
 
-# First build will download Docker image and toolchain
-./fbt fap_contactless_hid_device
+# Aliases
+./build.sh ofw   # Official
+./build.sh ul    # Unleashed
+./build.sh mntm  # Momentum
+./build.sh rm    # RogueMaster
 ```
 
-### Build Commands
+**Output**: `dist/<firmware>/<version>/contactless_hid_device.fap`
+
+**Features**:
+- Auto-detects latest stable tag for Official firmware
+- Uses release branch for custom firmwares by default
+- Warns when firmware version changes
+- Updates submodules automatically
+- Creates organized dist/ directory structure
+
+#### 2. `deploy.sh` - Build and deploy to connected Flipper
 ```bash
-# Build the app
-./fbt fap_contactless_hid_device
+# Usage
+./deploy.sh [firmware] [--branch BRANCH] [--tag TAG]
 
-# Build and deploy to connected Flipper via USB
-./fbt launch APPSRC=applications_user/contactless_hid_device
-
-# Clean build
-./fbt -c fap_contactless_hid_device
+# Examples
+./deploy.sh official   # Build and deploy Official firmware
+./deploy.sh momentum   # Build and deploy Momentum firmware
 ```
 
-### Build Verification Checkpoints
-- [ ] Boilerplate builds successfully before any changes
-- [ ] Build succeeds after renaming
-- [ ] Build succeeds after each new module added
-- [ ] No warnings in final build
+**Features**:
+- Verifies Flipper is connected (/dev/ttyACM0)
+- Warns about firmware version mismatches
+- Uploads and launches app automatically
+- Uses fbt's built-in launch command
+
+#### 3. `build-all-firmwares.sh` - Build for all firmwares
+```bash
+# Usage
+./build-all-firmwares.sh [--branch BRANCH] [--tag TAG]
+
+# Example
+./build-all-firmwares.sh  # Build for all available firmwares
+```
+
+**Output**: `dist/<firmware>/<version>/contactless_hid_device.fap` for each firmware
+
+### Firmware Update Detection
+
+The build scripts **automatically detect firmware version changes** and display warnings:
+
+```
+⚠️ FIRMWARE VERSION CHANGED: release → tag 1.3.5 (a1b2c3d)
+```
+
+When you see this warning:
+1. **Read the firmware changelog** for API changes
+2. **Run regression tests** after building
+3. **Check for deprecation warnings** during build
+4. **Test on actual hardware** before distribution
 
 ---
 
-## Flipper Zero UX Guidelines
+## Testing & Validation Protocols
+
+### Pre-Release Testing Checklist
+
+Before releasing any update, **ALL** tests must pass on **ALL** supported firmwares.
+
+#### Build Validation
+- [ ] Official firmware: builds without warnings
+- [ ] Unleashed firmware: builds without warnings
+- [ ] Momentum firmware: builds without warnings
+- [ ] RogueMaster firmware: builds without warnings (or document known issues)
+
+#### Core Functionality Tests
+
+**NFC Reading** (test on each firmware)
+- [ ] ISO14443A tag UID read correctly
+- [ ] 4-byte UID formatted correctly
+- [ ] 7-byte UID formatted correctly
+- [ ] Tag removal detected
+- [ ] Multiple consecutive scans work
+
+**RFID Reading** (test on each firmware)
+- [ ] EM4100 tag UID read correctly
+- [ ] HID Prox tag works (if available)
+- [ ] Tag removal detected
+- [ ] Multiple consecutive scans work
+
+**NDEF Parsing** (test on each firmware)
+- [ ] Type 2 NDEF text record parsed (NTAG)
+- [ ] Type 4 NDEF text record parsed (if available)
+- [ ] Type 5 NDEF text record parsed (if available)
+- [ ] Non-NDEF tag shows error in NDEF mode
+- [ ] Non-NDEF tag outputs UID in NFC/combo modes
+
+**HID Output** (test on each firmware)
+- [ ] USB HID connection detected
+- [ ] USB HID types characters correctly
+- [ ] USB HID Enter key works when enabled
+- [ ] BT HID pairing works
+- [ ] BT HID types characters correctly
+- [ ] Dual output (USB + BT) works simultaneously
+- [ ] "Connect USB or BT HID" shown when disconnected
+
+**Scan Modes** (test on each firmware)
+- [ ] NFC Only: scan → output UID → cooldown
+- [ ] RFID Only: scan → output UID → cooldown
+- [ ] NDEF Mode: scan NDEF tag → output text → cooldown
+- [ ] NDEF Mode: scan non-NDEF → red LED → no output
+- [ ] NFC+RFID: both scanned → combined output
+- [ ] NFC+RFID: timeout after 5s if second tag missing
+- [ ] RFID+NFC: both scanned → combined output
+- [ ] RFID+NFC: timeout after 5s if second tag missing
+
+**Settings & Persistence** (test on each firmware)
+- [ ] Delimiter changes apply to output
+- [ ] Append Enter toggle works
+- [ ] Output mode (USB/BLE) switches dynamically without restart
+- [ ] Vibration level changes work
+- [ ] Scan logging to SD works when enabled
+- [ ] Mode startup behavior persists across restarts
+- [ ] Settings persist across app restarts
+
+**UI/UX** (test on each firmware)
+- [ ] Mode selector navigates correctly
+- [ ] Back button returns to previous screen
+- [ ] Status messages display clearly
+- [ ] Haptic feedback fires on scan
+- [ ] LED feedback works (green=success, red=error)
+- [ ] BT pairing instructions display correctly
+
+#### Edge Case Tests
+- [ ] Tag left on reader: ignored until removed
+- [ ] Rapid consecutive scans: cooldown prevents spam
+- [ ] Very long NDEF payload: truncated gracefully
+- [ ] App survives USB disconnect/reconnect
+- [ ] App survives BT disconnect/reconnect
+- [ ] No crashes during normal operation
+- [ ] No memory leaks (run app for extended period)
+
+### Regression Test Protocol
+
+After **any** code change (bug fix, firmware adaptation, etc.):
+
+1. **Build on all firmwares** - Ensure no new warnings
+2. **Run core functionality tests** (minimum)
+3. **Test the specific area changed** (thorough)
+4. **Check for unintended side effects** in related code
+5. **Verify settings persistence** still works
+6. **Document any behavioral changes**
+
+---
+
+## Firmware Update Procedures
+
+### When a New Firmware Version is Released
+
+Follow this procedure **for each supported firmware** when a new version is released:
+
+#### Step 1: Update Local Firmware Clone
+```bash
+cd /home/work/flipperzero-firmware  # or unleashed/momentum/roguemaster
+git fetch --all --tags
+git checkout <new-version>  # or release branch
+git submodule update --init --recursive
+```
+
+#### Step 2: Review Firmware Changelog
+- Read the firmware's CHANGELOG.md or release notes
+- Look for **API changes** affecting:
+  - NFC/RFID workers
+  - HID keyboard (USB/BT)
+  - GUI components (ViewDispatcher, SceneManager, etc.)
+  - Storage/settings APIs
+  - Notification/feedback APIs
+
+#### Step 3: Build and Check for Issues
+```bash
+cd "/home/work/contactless hid device"
+./build.sh <firmware>
+```
+
+Watch for:
+- **Compilation errors** → API breaking change
+- **New warnings** → Deprecation or API change
+- **Missing symbols** → Removed API functions
+- **Link errors** → Library changes
+
+#### Step 4: Address API Changes
+
+If APIs have changed, follow this pattern:
+
+##### Pattern 1: Deprecated API
+```c
+// Old API (deprecated)
+nfc_worker_start(worker, callback);
+
+// New API
+nfc_worker_start_ex(worker, callback, context);
+
+// Solution: Update calls, test thoroughly
+```
+
+##### Pattern 2: Removed API
+```c
+// Old API (removed)
+furi_hal_usb_hid_kb_press(key);
+
+// New API (different module)
+usb_hid_keyboard_press(hid, key);
+
+// Solution: Find replacement in firmware docs, update code
+```
+
+##### Pattern 3: Changed Behavior
+```c
+// Example: NFC poller now requires explicit restart after error
+// Old: Auto-restarts on error
+// New: Must call nfc_poller_restart() manually
+
+// Solution: Update error handling logic
+```
+
+**Important**: Always check the firmware's migration guide or API documentation.
+
+#### Step 5: Run Full Regression Tests
+- [ ] Build succeeds on updated firmware
+- [ ] Run complete testing checklist (see above)
+- [ ] Test on actual hardware with the new firmware flashed
+- [ ] Verify no behavioral changes in existing features
+
+#### Step 6: Update Other Firmwares
+- Repeat Steps 1-5 for **all** supported firmwares
+- Document any firmware-specific quirks or workarounds
+
+#### Step 7: Update Build Scripts (if needed)
+- If default branches/tags change, update build.sh defaults
+- Update BUILD_MULTI_FIRMWARE.md with new version info
+
+#### Step 8: Document Changes
+Update [docs/changelog.md](docs/changelog.md) with:
+- Firmware versions tested
+- Any code changes made for compatibility
+- Known issues or workarounds
+
+---
+
+## Code Architecture Reference
+
+### File Structure
+```
+contactless_hid_device/
+├── application.fam              # App manifest (dependencies, version)
+├── hid_device.c/h               # Main app entry, lifecycle, state
+├── helpers/
+│   ├── hid_device_hid.c/h       # HID interface (USB/BT abstraction)
+│   ├── hid_device_hid_worker.c/h # HID worker thread (non-blocking)
+│   ├── hid_device_nfc.c/h       # NFC worker, NDEF parsing
+│   ├── hid_device_rfid.c/h      # RFID worker
+│   ├── hid_device_format.c/h    # UID formatting, delimiter logic
+│   ├── hid_device_storage.c/h   # Settings persistence (storage API)
+│   ├── hid_device_log.c/h       # SD card scan logging
+│   ├── hid_device_haptic.c/h    # Vibration feedback
+│   ├── hid_device_led.c/h       # LED feedback
+│   ├── hid_device_speaker.c/h   # Audio feedback
+│   └── hid_device_debug.c/h     # Debug logging utilities
+├── scenes/
+│   ├── hid_device_scene.c/h     # Scene manager definitions
+│   ├── hid_device_scene_menu.c  # Main menu scene
+│   ├── hid_device_scene_startscreen.c # Scanning screen scene
+│   ├── hid_device_scene_settings.c # Settings screen scene
+│   └── hid_device_scene_bt_pair.c # BT pairing scene
+├── views/
+│   └── hid_device_startscreen.c/h # Custom scanning view
+├── icons/                        # PNG assets
+├── docs/                         # Documentation
+├── build.sh                      # Single-firmware build script
+├── deploy.sh                     # Build and deploy script
+└── build-all-firmwares.sh        # Multi-firmware build script
+```
+
+### Key Architecture Patterns
+
+#### 1. HID Worker Thread Pattern
+The HID module runs in a **separate worker thread** to avoid blocking the UI thread during Bluetooth operations (which can take 100ms+).
+
+**Location**: [helpers/hid_device_hid_worker.c](helpers/hid_device_hid_worker.c)
+
+**Key Functions**:
+- `hid_device_hid_worker_alloc()` - Creates worker thread
+- `hid_device_hid_worker_start()` - Starts HID in background
+- `hid_device_hid_worker_type_string()` - Queues typing (non-blocking)
+- `hid_device_hid_worker_get_hid()` - Gets HID instance
+
+**Thread Safety**: Uses FuriMessageQueue for UI ↔ worker communication.
+
+#### 2. Dynamic Output Mode Switching
+USB ↔ BLE switching happens **without app restart**, similar to Bad USB.
+
+**Location**: [hid_device.c:195](hid_device.c#L195) - `hid_device_switch_output_mode()`
+
+**Pattern**:
+1. Stop NFC/RFID workers
+2. Stop HID worker
+3. Deinit old HID profile
+4. Switch mode in settings
+5. Init new HID profile
+6. Restart HID worker
+7. Restart NFC/RFID workers
+
+**Important**: Always stop workers before HID operations to avoid crashes.
+
+#### 3. NFC Error Recovery
+NFC poller can fail and requires restart. The app **automatically recovers**.
+
+**Location**: [helpers/hid_device_nfc.c](helpers/hid_device_nfc.c) - NFC worker callback
+
+**Pattern**:
+```c
+case NfcPollerEventTypeStopped:
+    // Poller stopped (error or intentional)
+    if (nfc->running) {
+        // Auto-restart if we're supposed to be running
+        nfc_poller_start(nfc->poller, callback, context);
+    }
+    break;
+```
+
+**Critical**: Do NOT remove this auto-restart logic or NFC will stop working after first error.
+
+#### 4. Scan State Machine
+Manages scanning lifecycle across single and combo modes.
+
+**Location**: [hid_device.h:66](hid_device.h#L66) - `HidDeviceScanState` enum
+
+**States**:
+- `Idle` - Not scanning
+- `Scanning` - Waiting for first tag
+- `WaitingSecond` - Combo mode, waiting for second tag
+- `Displaying` - Showing result briefly
+- `Cooldown` - Preventing re-scan of same tag
+
+**Timers**:
+- `timeout_timer` - 5s timeout for second tag in combo mode
+- `display_timer` - Brief display before returning to scanning
+
+**Location**: Scene startscreen manages state transitions.
+
+#### 5. Settings Persistence
+Settings are saved to `/ext/apps_data/hid_device/settings.txt` using Flipper's storage API.
+
+**Location**: [helpers/hid_device_storage.c](helpers/hid_device_storage.c)
+
+**Settings**:
+- `delimiter` (string)
+- `append_enter` (bool)
+- `mode` (last used scan mode)
+- `mode_startup_behavior` (enum)
+- `output_mode` (USB/BLE)
+- `vibration_level` (enum)
+- `log_to_sd` (bool)
+
+**Important**: Settings format is plain text key=value. Don't change format without migration logic.
+
+---
+
+## Monitoring Firmware API Changes
+
+### Critical APIs to Watch
+
+Monitor these firmware areas for breaking changes:
+
+#### 1. NFC APIs
+**Files to watch**: `lib/nfc/`, `furi_hal_nfc.h`
+
+**Current usage**:
+- `nfc_poller_alloc()` - Create NFC poller
+- `nfc_poller_start()` - Start polling
+- `nfc_poller_stop()` - Stop polling
+- `nfc_poller_free()` - Cleanup
+- `NfcPollerEvent` callbacks - Tag detection
+
+**Type 4 NDEF**:
+- `iso14443_4a_poller_send_apdu()` - APDU commands
+- SELECT NDEF app, READ commands
+
+**Type 5 NDEF**:
+- `iso15693_poller_read_single_block()` - Block reads
+
+**Location**: [helpers/hid_device_nfc.c](helpers/hid_device_nfc.c)
+
+#### 2. RFID APIs
+**Files to watch**: `lib/lfrfid/`, `furi_hal_rfid.h`
+
+**Current usage**:
+- `lfrfid_worker_alloc()` - Create RFID worker
+- `lfrfid_worker_start_read()` - Start reading
+- `lfrfid_worker_stop()` - Stop reading
+- `lfrfid_worker_free()` - Cleanup
+- Protocol-specific UID extraction
+
+**Location**: [helpers/hid_device_rfid.c](helpers/hid_device_rfid.c)
+
+#### 3. HID APIs
+**Files to watch**: `furi_hal_usb_hid.h`, `furi_hal_bt_hid.h`
+
+**USB HID current usage**:
+- `furi_hal_usb_set_config(&usb_hid, NULL)` - Enable USB HID
+- `furi_hal_usb_is_connected()` - Check connection
+- `furi_hal_hid_kb_press()` / `release()` - Type keys
+
+**BT HID current usage**:
+- `bt_set_profile(bt, BtProfileHidKeyboard)` - Enable BT HID
+- `furi_hal_bt_is_active()` - Check connection
+- `furi_hal_bt_hid_kb_press()` / `release()` - Type keys
+
+**Location**: [helpers/hid_device_hid.c](helpers/hid_device_hid.c)
+
+#### 4. GUI/Scene APIs
+**Files to watch**: `gui/`, `scene_manager.h`
+
+**Current usage**:
+- `ViewDispatcher`, `SceneManager` - Navigation
+- `Submenu`, `VariableItemList` - Standard widgets
+- Custom view: `HidDeviceStartscreen`
+
+**Location**: [hid_device.c](hid_device.c), [scenes/](scenes/)
+
+### How to Monitor
+
+1. **Subscribe to firmware release notifications** on GitHub
+2. **Read changelogs** before updating
+3. **Search for "BREAKING"** in release notes
+4. **Check API header files** for deprecation warnings
+5. **Build regularly** against latest firmware to catch issues early
+
+---
+
+## Troubleshooting & Common Issues
+
+### Build Issues
+
+#### "Application not found" or Symlink Errors
+**Symptom**: `fbt` can't find the app
+
+**Solution**:
+```bash
+# Ensure symlink exists
+ln -s "/home/work/contactless hid device" /home/work/flipperzero-firmware/applications_user/contactless_hid_device
+```
+
+**Note**: Build scripts create symlinks automatically, but manual builds may need this.
+
+#### Build Warnings
+**Symptom**: Compiler warnings during build
+
+**Action**:
+- **Do NOT ignore warnings** - they often indicate deprecated API usage
+- Investigate each warning and fix the root cause
+- Warnings today become errors in future firmware versions
+
+#### "Undefined reference" Errors
+**Symptom**: Linker errors about missing symbols
+
+**Cause**: Firmware API changed or removed functions
+
+**Solution**:
+1. Search firmware source for new function name
+2. Check firmware migration guide
+3. Update code to use new API
+4. Test thoroughly
+
+### Runtime Issues
+
+#### App Crashes on Launch
+**Possible causes**:
+- Firmware version mismatch (FAP built for different firmware)
+- API incompatibility
+- Memory allocation failure
+
+**Diagnosis**:
+1. Check Flipper firmware version matches build target
+2. Flash matching firmware: `cd /path/to/firmware && ./fbt flash_usb`
+3. Rebuild FAP for correct firmware
+4. Check logs on Flipper (if serial console available)
+
+#### NFC/RFID Not Detecting Tags
+**Possible causes**:
+- Worker not started
+- Poller failure without recovery
+- Hardware issue
+
+**Diagnosis**:
+1. Test with official NFC/RFID apps (verify hardware works)
+2. Check debug logs (if enabled)
+3. Verify worker callbacks are being called
+4. Check auto-restart logic in NFC worker
+
+#### HID Output Not Working
+**Possible causes**:
+- USB/BT not connected
+- HID profile not started
+- Character mapping issue
+
+**Diagnosis**:
+1. Check status bar shows "USB" or "BT"
+2. Verify connection on host device
+3. Test with simple string (e.g., "TEST")
+4. Check HID worker thread is running
+
+#### Settings Not Persisting
+**Possible causes**:
+- SD card not mounted
+- Storage API failure
+- Permissions issue
+
+**Diagnosis**:
+1. Check `/ext/apps_data/hid_device/` exists
+2. Verify SD card is mounted and writable
+3. Check storage API return codes
+4. Test with minimal settings (just one value)
+
+---
+
+## Quality Gates for Updates
+
+### Before Committing Any Code Change
+
+- [ ] Code compiles on **all** supported firmwares without warnings
+- [ ] Change is **necessary** (bug fix, firmware adaptation, or requested feature)
+- [ ] Change does **not** break existing functionality (regression test)
+- [ ] Change follows **existing code style** and patterns
+- [ ] No over-engineering or unnecessary refactoring
+
+### Before Tagging a Release
+
+- [ ] **Full regression test** passes on all firmwares
+- [ ] All changes documented in [docs/changelog.md](docs/changelog.md)
+- [ ] README.md updated if user-facing changes
+- [ ] Build scripts tested and working
+- [ ] FAP files built for all firmwares
+- [ ] Version number incremented in `application.fam`
+- [ ] Git tag created with version number
+
+### Release Testing Matrix
+
+Test **every combination**:
+
+| Firmware | NFC | RFID | NDEF | USB HID | BT HID | Settings |
+|----------|-----|------|------|---------|--------|----------|
+| Official | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Unleashed | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Momentum | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| RogueMaster | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+
+**Legend**:
+- ✅ Fully tested and working
+- ⚠️ Tested with known issues documented
+- ❌ Not working (blocking issue)
+
+**Goal**: All checkmarks green before release (RogueMaster warnings acceptable if documented).
+
+---
+
+## Communication Protocol
+
+### When Firmware Updates Break Compatibility
+
+If a firmware update introduces breaking API changes:
+
+1. **Document the issue** in a new GitHub issue
+2. **Identify the breaking change** (API function, behavior change, etc.)
+3. **Find the new API** in firmware source or docs
+4. **Implement fix** following existing patterns
+5. **Test thoroughly** on affected firmware
+6. **Verify other firmwares** still work
+7. **Update changelog** with firmware-specific notes
+
+### When to Ask for Help
+
+Ask the user for guidance when:
+- Multiple equally valid solutions exist for an API change
+- Firmware behavior changed without clear migration path
+- Test results are ambiguous or inconsistent
+- Major architectural decision needed
+
+Provide:
+- Clear description of the problem
+- Firmware versions affected
+- Potential solutions with trade-offs
+- Recommendation based on project goals
+
+---
+
+## Reference: UX Guidelines
 
 ### Display Constraints
 - **Screen**: 128x64 pixels, monochrome
@@ -102,247 +705,7 @@ ln -s "/home/work/contactless hid reader" applications_user/contactless_hid_devi
 
 ---
 
-## Code Architecture
-
-### File Naming Convention
-All files use `hid_device_` prefix after renaming:
-```
-hid_device.c              # Main app entry, allocation, lifecycle
-hid_device.h              # Main app struct and types
-helpers/
-  hid_device_hid.c/h      # USB + Bluetooth HID output
-  hid_device_nfc.c/h      # NFC reading and NDEF parsing
-  hid_device_rfid.c/h     # RFID reading
-  hid_device_scan.c/h     # Scan state machine and modes
-  hid_device_format.c/h   # UID formatting with delimiter
-  hid_device_storage.c/h  # Settings persistence
-scenes/
-  hid_device_scene.c/h    # Scene manager
-  hid_device_scene_home.c # Main scanning screen
-  hid_device_scene_advanced.c # Settings screen
-  hid_device_scene_ndef.c # NDEF inspector
-views/
-  hid_device_home_view.c/h # Custom home screen view
-```
-
-### Main App Struct (hid_device.h)
-```c
-typedef struct {
-    // Core Flipper components
-    Gui* gui;
-    ViewDispatcher* view_dispatcher;
-    SceneManager* scene_manager;
-    NotificationApp* notification;
-
-    // Views and widgets
-    Submenu* submenu;
-    VariableItemList* variable_item_list;
-    HidDeviceHomeView* home_view;
-    TextInput* text_input;
-
-    // Device workers
-    NfcWorker* nfc_worker;
-    LfRfidWorker* rfid_worker;
-
-    // HID connections
-    FuriHalUsbHidConfig* usb_hid;
-    bool bt_hid_connected;
-    bool usb_hid_connected;
-
-    // Scan state
-    HidDeviceMode mode;           // Current mode
-    HidDeviceScanState scan_state; // State machine
-    uint8_t nfc_uid[10];
-    uint8_t nfc_uid_len;
-    uint8_t rfid_uid[8];
-    uint8_t rfid_uid_len;
-    char ndef_payload[256];
-    FuriTimer* timeout_timer;
-    FuriTimer* display_timer;
-
-    // Settings
-    char delimiter[8];
-    bool append_enter;
-
-    // UI state
-    char status_text[32];
-    char uid_display[64];
-} HidDevice;
-
-typedef enum {
-    HidDeviceModeNfc,
-    HidDeviceModeRfid,
-    HidDeviceModeNdef,
-    HidDeviceModeNfcThenRfid,
-    HidDeviceModeRfidThenNfc,
-} HidDeviceMode;
-
-typedef enum {
-    HidDeviceScanStateIdle,
-    HidDeviceScanStateScanning,
-    HidDeviceScanStateWaitingSecond,
-    HidDeviceScanStateDisplaying,
-    HidDeviceScanStateCooldown,
-} HidDeviceScanState;
-```
-
-### application.fam Updates Required
-```python
-App(
-    appid="contactless_hid_device",
-    name="Contactless HID Device",
-    apptype=FlipperAppType.EXTERNAL,
-    entry_point="hid_device_app",
-    requires=[
-        "gui",
-        "storage",
-        "nfc",          # Add for NFC reading
-        "lfrfid",       # Add for RFID reading
-        "bt",           # Add for Bluetooth HID
-    ],
-    stack_size=4 * 1024,  # Increase for NFC/RFID workers
-    fap_icon="icons/hid_device_10px.png",
-    fap_category="NFC",
-    fap_version="1.0",
-)
-```
-
----
-
-## Implementation Order
-
-Follow this exact order to ensure incremental, testable progress:
-
-### Phase 1: Build Environment (No Flipper needed)
-1. Clone firmware repo
-2. Symlink app
-3. Verify boilerplate builds
-
-### Phase 2: Rename (No Flipper needed)
-1. Rename all files
-2. Update application.fam
-3. Search/replace all "boilerplate" references
-4. Remove demo scenes (scene_1 through scene_6)
-5. Verify build
-
-### Phase 3: HID Module (Flipper needed for testing)
-1. Implement USB HID connection detection
-2. Implement USB HID character typing
-3. Implement BT HID connection detection
-4. Implement BT HID character typing
-5. Create simple test: type "HELLO" on button press
-6. **TEST CHECKPOINT**: Verify typing works on USB and BT
-
-### Phase 4: NFC Module (Flipper + NFC tags needed)
-1. Initialize NFC worker
-2. Implement tag detection callback
-3. Extract UID from detected tag
-4. Implement NDEF text record parsing
-5. **TEST CHECKPOINT**: Show detected UID on screen
-
-### Phase 5: RFID Module (Flipper + RFID tags needed)
-1. Initialize LFRFID worker
-2. Implement tag detection callback
-3. Extract UID from detected tag
-4. **TEST CHECKPOINT**: Show detected RFID UID on screen
-
-### Phase 6: UID Formatting
-1. Implement hex byte to string conversion
-2. Apply delimiter between bytes
-3. Concatenate NDEF payload
-4. Add Enter key if enabled
-5. **TEST CHECKPOINT**: Formatted output displays correctly
-
-### Phase 7: Scan Modes
-1. Implement single-tag modes (NFC only, RFID only, NDEF only)
-2. Implement combo mode state machine
-3. Implement timeout handling
-4. Implement NDEF mode error handling (red LED for non-NDEF tags)
-5. **TEST CHECKPOINT**: All 5 modes work correctly
-
-### Phase 8: UI Polish
-1. Implement home screen with mode selector
-2. Implement HID status line
-3. Implement Advanced Settings screen
-4. Implement NDEF Inspector
-5. Add haptic/LED/sound feedback
-6. **TEST CHECKPOINT**: Full UX flow works smoothly
-
-### Phase 9: Final Testing
-1. Test all modes with various tags
-2. Test edge cases (tag left on, rapid scans, no HID)
-3. Test settings persistence
-4. Test BT pairing flow
-5. **FINAL CHECKPOINT**: App is complete and polished
-
----
-
-## Testing Protocol
-
-### Required Test Equipment
-- Flipper Zero device
-- USB cable for deployment
-- Computer with USB for USB HID testing
-- Phone/computer for Bluetooth HID testing
-- NFC tags: NTAG215, MIFARE Classic, any ISO14443A
-- RFID tags: EM4100, HID Prox (if available)
-- NFC tag with NDEF text record (can write one using phone)
-
-### Test Checklist
-
-#### HID Output Tests
-- [ ] USB HID types characters correctly
-- [ ] USB HID types Enter key when enabled
-- [ ] BT HID pairs successfully
-- [ ] BT HID types characters correctly
-- [ ] Both USB and BT receive output when both connected
-- [ ] "Connect USB or BT HID" shown when neither connected
-- [ ] Scanning disabled when no HID connection
-
-#### NFC Tests
-- [ ] ISO14443A tag UID read correctly
-- [ ] 4-byte UID formatted correctly
-- [ ] 7-byte UID formatted correctly
-- [ ] NDEF text record parsed correctly in NDEF mode
-- [ ] Non-NDEF tag outputs UID in NFC/combo modes
-- [ ] Non-NDEF tag shows error in NDEF mode (no output)
-- [ ] Tag removal detected
-
-#### RFID Tests
-- [ ] EM4100 tag UID read correctly
-- [ ] HID Prox tag UID read (if available)
-- [ ] Tag removal detected
-
-#### Mode Tests
-- [ ] NFC mode: scan → output UID → cooldown
-- [ ] RFID mode: scan → output UID → cooldown
-- [ ] NDEF mode: scan tag with NDEF → output NDEF text only → cooldown
-- [ ] NDEF mode: scan tag without NDEF → red LED flash → timeout → no output
-- [ ] NFC→RFID: both scanned → combined UIDs output
-- [ ] NFC→RFID: timeout if second tag missing
-- [ ] RFID→NFC: both scanned → combined UIDs output
-- [ ] RFID→NFC: timeout if second tag missing
-
-#### UI Tests
-- [ ] Mode selector navigates correctly
-- [ ] Back button returns to previous screen
-- [ ] Settings toggles work
-- [ ] Delimiter can be changed
-- [ ] NDEF Inspector lists records
-- [ ] Status messages display correctly
-- [ ] Haptic feedback fires on scan
-
-#### Edge Case Tests
-- [ ] Tag left on reader: ignored until removed
-- [ ] Rapid consecutive scans: cooldown prevents spam
-- [ ] Tag with no NDEF in NFC/combo modes: works (UID only)
-- [ ] Tag with no NDEF in NDEF mode: error shown, no output
-- [ ] Very long NDEF payload: truncated gracefully
-- [ ] Settings persist across app restart
-
----
-
-## Common Pitfalls to Avoid
+## Reference: Common Pitfalls
 
 ### Memory Management
 - Always free allocated resources in `_free()` functions
@@ -376,128 +739,45 @@ Follow this exact order to ensure incremental, testable progress:
 
 ---
 
-## API Quick Reference
+## Final Notes
 
-### USB HID
-```c
-#include <furi_hal_usb_hid.h>
+### Stability is the Goal
 
-// Initialize
-furi_hal_usb_set_config(&usb_hid_config, NULL);
+This project is **feature-complete**. The goal is to **maintain stability** as firmwares evolve, not to add new features.
 
-// Check connection
-bool connected = furi_hal_usb_is_connected();
+**Resist the temptation to**:
+- Refactor code that works
+- Add "nice to have" features
+- Optimize without profiling
+- Change UX without user feedback
 
-// Type character
-furi_hal_hid_kb_press(HID_KEYBOARD_A);
-furi_hal_hid_kb_release(HID_KEYBOARD_A);
-```
+**Focus energy on**:
+- Keeping up with firmware API changes
+- Fixing reported bugs
+- Maintaining cross-firmware compatibility
+- Improving test coverage
+- Documenting quirks and workarounds
 
-### Bluetooth HID
-```c
-#include <bt/bt_service/bt.h>
-#include <furi_hal_bt_hid.h>
+### Cross-Firmware Compatibility is Critical
 
-// Start BT HID
-bt_set_status_changed_callback(bt, callback, context);
-furi_hal_bt_start_advertising();
+Users rely on **all four firmwares**. A release that breaks one firmware is unacceptable.
 
-// Type character
-furi_hal_bt_hid_kb_press(HID_KEYBOARD_A);
-furi_hal_bt_hid_kb_release(HID_KEYBOARD_A);
-```
+**Always**:
+- Test on all firmwares before releasing
+- Document firmware-specific issues
+- Provide workarounds when possible
+- Keep build scripts up to date
 
-### NFC
-```c
-#include <lib/nfc/nfc.h>
-#include <lib/nfc/nfc_worker.h>
+### When in Doubt, Test More
 
-// Start NFC worker
-nfc_worker_start(worker, NfcWorkerStateDetect, callback, context);
+If uncertain about a change:
+- Run more tests
+- Test on more firmwares
+- Test on actual hardware
+- Ask for user validation
 
-// In callback, extract UID
-uint8_t* uid = nfc_data->uid;
-uint8_t uid_len = nfc_data->uid_len;
-```
-
-### LFRFID
-```c
-#include <lib/lfrfid/lfrfid_worker.h>
-
-// Start RFID worker
-lfrfid_worker_start_thread(worker);
-lfrfid_worker_read_start(worker, LFRFIDWorkerReadTypeAuto, callback, context);
-
-// In callback, get protocol data
-// UID extraction depends on protocol
-```
-
-### Timers
-```c
-// Create timer
-FuriTimer* timer = furi_timer_alloc(callback, FuriTimerTypeOnce, context);
-
-// Start timer (200ms)
-furi_timer_start(timer, furi_ms_to_ticks(200));
-
-// Stop timer
-furi_timer_stop(timer);
-
-// Free timer
-furi_timer_free(timer);
-```
+**Better to be slow and stable than fast and broken.**
 
 ---
 
-## Quality Gates
-
-Before marking any phase complete:
-
-1. **Build Gate**: Code compiles without warnings
-2. **Function Gate**: Feature works as specified
-3. **UX Gate**: Interaction feels responsive and intuitive
-4. **Edge Case Gate**: Handles error conditions gracefully
-5. **Integration Gate**: Works with previously completed features
-
-Before final delivery:
-
-1. All test checklist items pass
-2. No crashes or freezes during normal use
-3. Memory usage is stable (no leaks)
-4. App feels polished and professional
-5. User has confirmed app meets their needs
-
----
-
-## Communication Protocol
-
-### When to Ask User to Connect Flipper
-- After Phase 1: "Ready to test builds. Please connect Flipper via USB."
-- Phase 3: "HID module ready for testing. Connect Flipper."
-- Phase 4+: Keep Flipper connected for iterative testing.
-
-### What to Report
-- Build success/failure with any errors
-- Test results for each checkpoint
-- Any deviations from spec or design decisions made
-- Blockers or questions that need user input
-
-### How to Handle Issues
-- If build fails: Show error, attempt fix, retry
-- If feature doesn't work: Debug, show findings, propose solution
-- If spec is unclear: Ask user for clarification before proceeding
-- If hardware limitation found: Document and propose alternative
-
----
-
-## Final Deliverables
-
-1. **Working FAP**: Builds and runs on official firmware
-2. **All features**: Per specification document
-3. **Clean code**: Well-organized, properly named
-4. **Tested**: All checklist items verified
-5. **Documentation**: Updated README.md if needed
-
----
-
-*This document should be referenced throughout development. Update it if new patterns or issues are discovered.*
+*This document should be the primary reference for maintaining the Contactless HID Device app. Update it when new patterns or firmware-specific quirks are discovered.*

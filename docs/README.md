@@ -1,42 +1,216 @@
-# Contactless HID Device Documentation
+# Contactless HID Device - Documentation Index
 
-This directory contains additional documentation for the Contactless HID Device Flipper Zero application.
+Welcome to the comprehensive documentation for the Contactless HID Device Flipper Zero application.
 
-## Documentation Files
+---
 
-### [changelog.md](changelog.md)
-Version history and release notes for the application.
+## Documentation Overview
 
-### Project Documentation (Root Directory)
-- **[README.md](../README.md)** - Main project documentation, installation, and usage guide
-- **[CLAUDE.md](../CLAUDE.md)** - Comprehensive development guide for contributors
-- **[TYPE4_NDEF_STATUS.md](../TYPE4_NDEF_STATUS.md)** - NDEF implementation status and testing
+This project has extensive documentation to support **maintenance, stability, and cross-firmware compatibility** as the primary goals.
 
-## Quick Links
+### For Claude (AI Assistant)
 
-### For Users
-- [Installation Instructions](../README.md#installation)
-- [Usage Guide](../README.md#usage)
-- [Supported Tags](../README.md#supported-tags)
-- [Troubleshooting](../README.md#troubleshooting)
+**Start Here**: [../CLAUDE.md](../CLAUDE.md)
+- Comprehensive maintenance guide
+- Testing & validation protocols
+- Firmware update procedures
+- Code architecture reference
+- Quality gates and best practices
 
-### For Developers
-- [Building from Source](../README.md#building-from-source)
-- [Development Guide](../CLAUDE.md)
-- [Project Structure](../README.md#development)
-- [Contributing Guidelines](../README.md#contributing)
+### For Developers & Maintainers
 
-## External Resources
+**Core Documentation**:
+1. **[CLAUDE.md](../CLAUDE.md)** - Primary maintenance guide (start here!)
+2. **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Fast lookup for common tasks
+3. **[FIRMWARE_COMPATIBILITY.md](FIRMWARE_COMPATIBILITY.md)** - Compatibility matrix & tested versions
+4. **[API_MIGRATION_LOG.md](API_MIGRATION_LOG.md)** - Historical API changes & adaptations
+5. **[TESTING_AUTOMATION.md](TESTING_AUTOMATION.md)** - Testing strategy & automation
 
-- [Official Flipper Zero Documentation](https://docs.flipper.net/)
-- [Flipper Zero Firmware Repository](https://github.com/flipperdevices/flipperzero-firmware)
-- [Flipper Application API](https://github.com/flipperdevices/flipperzero-firmware/tree/dev/documentation)
-- [Community Forum](https://forum.flipper.net/)
+**Build & Deploy**:
+- **[BUILD_MULTI_FIRMWARE.md](../BUILD_MULTI_FIRMWARE.md)** - Multi-firmware build instructions
+- **Build Scripts**: `build.sh`, `deploy.sh`, `build-all-firmwares.sh` (in project root)
+
+**Version History**:
+- **[changelog.md](changelog.md)** - Version history and changes
+
+### For End Users
+
+**User Documentation**:
+- **[README.md](../README.md)** - User guide, installation, usage, features
+- **GitHub Releases** - Pre-built FAP files and release notes
+
+---
+
+## Document Structure
+
+```
+contactless_hid_device/
+├── CLAUDE.md                          # 🤖 AI Assistant: Main maintenance guide
+├── README.md                          # 👤 Users: Installation & usage
+├── BUILD_MULTI_FIRMWARE.md            # 🔧 Developers: Build instructions
+└── docs/
+    ├── README.md                      # 📚 This file (documentation index)
+    ├── QUICK_REFERENCE.md             # ⚡ Quick lookup & commands
+    ├── FIRMWARE_COMPATIBILITY.md      # ✅ Compatibility matrix
+    ├── API_MIGRATION_LOG.md           # 📝 API change history
+    ├── TESTING_AUTOMATION.md          # 🧪 Testing guide
+    └── changelog.md                   # 📅 Version history
+```
+
+---
+
+## Quick Navigation
+
+### I want to...
+
+**Build the app**
+→ See [Build Scripts](#build-scripts) or [BUILD_MULTI_FIRMWARE.md](../BUILD_MULTI_FIRMWARE.md)
+
+**Fix a bug**
+→ See [CLAUDE.md - Maintenance Philosophy](../CLAUDE.md#maintenance-philosophy)
+
+**Handle a firmware update**
+→ See [CLAUDE.md - Firmware Update Procedures](../CLAUDE.md#firmware-update-procedures)
+
+**Run tests**
+→ See [CLAUDE.md - Testing Protocols](../CLAUDE.md#testing--validation-protocols)
+
+**Check compatibility**
+→ See [FIRMWARE_COMPATIBILITY.md](FIRMWARE_COMPATIBILITY.md)
+
+**Find a command**
+→ See [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+
+**Understand API changes**
+→ See [API_MIGRATION_LOG.md](API_MIGRATION_LOG.md)
+
+**Automate tests**
+→ See [TESTING_AUTOMATION.md](TESTING_AUTOMATION.md)
+
+**Release a new version**
+→ See [Release Checklist](#release-checklist)
+
+---
+
+## Build Scripts
+
+The project includes three build scripts for multi-firmware support:
+
+### 1. Build for Specific Firmware
+```bash
+./build.sh [firmware] [--branch BRANCH] [--tag TAG]
+```
+
+**Examples**:
+```bash
+./build.sh official              # Latest stable (recommended)
+./build.sh unleashed             # Unleashed release branch
+./build.sh momentum              # Momentum release branch
+./build.sh official --tag 1.3.4  # Specific version
+```
+
+**Output**: `dist/<firmware>/<version>/contactless_hid_device.fap`
+
+### 2. Build and Deploy
+```bash
+./deploy.sh [firmware]
+```
+
+Builds and uploads to connected Flipper via USB.
+
+### 3. Build All Firmwares
+```bash
+./build-all-firmwares.sh
+```
+
+Builds FAPs for all supported firmwares (Official, Unleashed, Momentum, RogueMaster).
+
+---
+
+## Supported Firmwares
+
+| Firmware | Status | Build Command | Notes |
+|----------|--------|---------------|-------|
+| **Official** | ✅ Primary | `./build.sh official` | Main target, most stable |
+| **Unleashed** | ✅ Supported | `./build.sh unleashed` | Fully compatible |
+| **Momentum** | ✅ Supported | `./build.sh momentum` | Includes Xtreme |
+| **RogueMaster** | ⚠️ Secondary | `./build.sh roguemaster` | Test thoroughly |
+
+**Details**: See [FIRMWARE_COMPATIBILITY.md](FIRMWARE_COMPATIBILITY.md) for tested versions and known issues.
+
+---
+
+## Release Checklist
+
+Before creating a new release:
+
+1. **Code Quality**
+   - [ ] Builds on all 4 firmwares without warnings
+   - [ ] Full regression test suite passed
+   - [ ] No open critical bugs
+
+2. **Documentation**
+   - [ ] [changelog.md](changelog.md) updated
+   - [ ] [FIRMWARE_COMPATIBILITY.md](FIRMWARE_COMPATIBILITY.md) updated with tested versions
+   - [ ] [README.md](../README.md) updated (if user-facing changes)
+   - [ ] Version bumped in `application.fam`
+
+3. **Build & Tag**
+   - [ ] Build FAPs: `./build-all-firmwares.sh`
+   - [ ] Create git tag: `git tag v1.X`
+   - [ ] Push tag: `git push origin v1.X`
+
+4. **Release**
+   - [ ] Upload FAPs to GitHub release
+   - [ ] Write release notes (based on changelog)
+   - [ ] Test download links
+
+**Detailed Checklist**: See [QUICK_REFERENCE.md - Version Release Checklist](QUICK_REFERENCE.md#version-release-checklist)
+
+---
+
+## Maintenance Philosophy
+
+This project is **feature-complete**. Focus is on:
+
+✅ **Stability** - No changes without necessity
+✅ **Compatibility** - Test all firmwares before release
+✅ **Regression Prevention** - Validate all existing features
+✅ **API Monitoring** - Proactive firmware update tracking
+✅ **User Experience** - Consistent behavior across firmwares
+
+❌ **Avoid**: Unnecessary refactoring, feature creep, untested changes
+
+**Full Philosophy**: See [CLAUDE.md - Maintenance Philosophy](../CLAUDE.md#maintenance-philosophy)
+
+---
+
+## Resources
+
+### Official Links
+- **Flipper Devices**: https://docs.flipper.net/
+- **Official Firmware**: https://github.com/flipperdevices/flipperzero-firmware
+- **Unleashed**: https://github.com/DarkFlippers/unleashed-firmware
+- **Momentum**: https://github.com/Next-Flip/Momentum-Firmware
+- **RogueMaster**: https://github.com/RogueMaster/flipperzero-firmware-wPlugins
+
+### Community
+- **Flipper Forum**: https://forum.flipper.net/
+- **Project Issues**: [GitHub Issues](../../issues)
+- **Discussions**: [GitHub Discussions](../../discussions)
+
+---
 
 ## Support
 
 If you encounter issues or have questions:
-1. Check the [Troubleshooting](../README.md#troubleshooting) section
-2. Review [open issues](../../issues) on GitHub
-3. Create a [new issue](../../issues/new) if your problem isn't already reported
-4. Join discussions in the [Discussions](../../discussions) section
+
+1. Check the [Troubleshooting](../README.md#troubleshooting) section in user docs
+2. Review [QUICK_REFERENCE.md - Common Issues](QUICK_REFERENCE.md#common-issues--quick-fixes)
+3. Review [open issues](../../issues) on GitHub
+4. Create a [new issue](../../issues/new) if your problem isn't already reported
+5. Join discussions in the [Discussions](../../discussions) section
+
+---
+
+*This documentation suite is designed to help maintain the Contactless HID Device app across firmware versions and years of development. Keep it updated and it will serve you well.*

@@ -23,6 +23,7 @@
 #include "helpers/hid_device_nfc.h"
 #include "helpers/hid_device_rfid.h"
 #include "helpers/hid_device_format.h"
+#include "helpers/hid_device_log.h"
 #include "contactless_hid_device_icons.h"
 
 #define TAG "HidDevice"
@@ -123,6 +124,7 @@ typedef struct {
     char delimiter[HID_DEVICE_DELIMITER_MAX_LEN];
     bool append_enter;
     HidDeviceVibration vibration_level;
+    bool log_to_sd;        // Log scanned UIDs to SD card
     bool restart_pending;  // True if output mode changed and restart is required
 
     // Output mode switching (async to avoid UI thread blocking on bt_profile_start)

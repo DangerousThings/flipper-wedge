@@ -9,6 +9,7 @@ enum SettingsIndex {
     SettingsIndexAppendEnter,
     SettingsIndexModeStartup,
     SettingsIndexVibration,
+    SettingsIndexLogToSd,
 };
 
 const char* const on_off_text[2] = {
@@ -110,6 +111,14 @@ static void hid_device_scene_settings_set_vibration(VariableItem* item) {
 
     variable_item_set_current_value_text(item, vibration_text[index]);
     app->vibration_level = (HidDeviceVibration)index;
+}
+
+static void hid_device_scene_settings_set_log_to_sd(VariableItem* item) {
+    HidDevice* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+
+    variable_item_set_current_value_text(item, on_off_text[index]);
+    app->log_to_sd = (index == 1);
 }
 
 static void hid_device_scene_settings_set_output(VariableItem* item) {
@@ -253,6 +262,16 @@ void hid_device_scene_settings_on_enter(void* context) {
         app);
     variable_item_set_current_value_index(item, app->vibration_level);
     variable_item_set_current_value_text(item, vibration_text[app->vibration_level]);
+
+    // Log to SD toggle
+    item = variable_item_list_add(
+        app->variable_item_list,
+        "Log to SD:",
+        2,
+        hid_device_scene_settings_set_log_to_sd,
+        app);
+    variable_item_set_current_value_index(item, app->log_to_sd ? 1 : 0);
+    variable_item_set_current_value_text(item, on_off_text[app->log_to_sd ? 1 : 0]);
 
     // Set callback for when user clicks on an item
     variable_item_list_set_enter_callback(

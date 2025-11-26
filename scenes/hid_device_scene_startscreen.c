@@ -159,6 +159,11 @@ static void hid_device_scene_startscreen_output_and_reset(HidDevice* app) {
         if(app->append_enter) {
             hid_device_hid_press_enter(hid_device_get_hid(app));
         }
+
+        // Log to SD card if enabled
+        if(app->log_to_sd) {
+            hid_device_log_scan(app->output_buffer);
+        }
     }
 
     // LED feedback (haptic happens later when "Sent" is displayed)

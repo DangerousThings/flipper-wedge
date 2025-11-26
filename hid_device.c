@@ -69,6 +69,7 @@ HidDevice* hid_device_app_alloc() {
     app->delimiter[0] = '\0';  // Empty delimiter by default
     app->append_enter = true;
     app->vibration_level = HidDeviceVibrationMedium;  // Default: Medium vibration
+    app->log_to_sd = false;  // Default: Logging disabled for privacy/performance
     app->restart_pending = false;  // Deprecated field, no longer used
     app->output_switch_pending = false;
     app->output_switch_target = HidDeviceOutputUsb;
