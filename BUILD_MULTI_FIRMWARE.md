@@ -155,7 +155,7 @@ cd /home/work/roguemaster-firmware && git pull --recurse-submodules
 ### Symlink Issues
 If the build script can't find the app, manually create the symlink:
 ```bash
-ln -s "/home/work/contactless hid reader" <firmware-path>/applications_user/contactless_hid_device
+ln -s "/home/work/contactless hid device" <firmware-path>/applications_user/contactless_hid_device
 ```
 
 ### Build Errors
