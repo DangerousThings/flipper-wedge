@@ -4,20 +4,23 @@
 APP_NAME="contactless_hid_device"
 APP_DIR="/home/work/contactless hid device"
 
-# Default values
+# Default values (will be set based on firmware choice)
 FIRMWARE="official"
-BRANCH="release"
+BRANCH=""
 TAG=""
+USE_DEFAULT="true"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --branch)
             BRANCH="$2"
+            USE_DEFAULT="false"
             shift 2
             ;;
         --tag)
             TAG="$2"
+            USE_DEFAULT="false"
             shift 2
             ;;
         official|ofw|unleashed|ul|momentum|mntm|xtreme|xfw|roguemaster|rm)
@@ -30,19 +33,20 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [firmware] [--branch BRANCH] [--tag TAG]"
             echo ""
             echo "Firmware options:"
-            echo "  official:     ofw"
-            echo "  unleashed:    ul"
-            echo "  momentum:     mntm, xtreme, xfw"
-            echo "  roguemaster:  rm"
+            echo "  official:     ofw      (default: latest stable tag)"
+            echo "  unleashed:    ul       (default: release branch)"
+            echo "  momentum:     mntm     (default: release branch)"
+            echo "  roguemaster:  rm       (default: release branch)"
             echo ""
             echo "Flags:"
-            echo "  --branch BRANCH  Git branch to checkout (default: release)"
+            echo "  --branch BRANCH  Git branch to checkout"
             echo "  --tag TAG        Git tag to checkout (overrides --branch)"
             echo ""
             echo "Examples:"
-            echo "  $0 official"
-            echo "  $0 official --branch dev"
-            echo "  $0 official --tag 1.2.3"
+            echo "  $0 official                # Latest stable release (recommended)"
+            echo "  $0 official --branch dev   # Development branch"
+            echo "  $0 official --tag 1.3.4    # Specific version"
+            echo "  $0 momentum                # Momentum release branch"
             exit 1
             ;;
     esac
@@ -178,7 +182,52 @@ esac
 
 if [ ! -d "$FW_PATH" ]; then
     echo "❌ Error: ${FW_NAME} firmware not found at ${FW_PATH}"
+    echo "Clone it with:"
+    case $FIRMWARE in
+        official|ofw)
+            echo "  git clone --recursive https://github.com/flipperdevices/flipperzero-firmware.git ${FW_PATH}"
+            ;;
+        unleashed|ul)
+            echo "  git clone --recursive https://github.com/DarkFlippers/unleashed-firmware.git ${FW_PATH}"
+            ;;
+        momentum|mntm|xtreme|xfw)
+            echo "  git clone --recursive https://github.com/Next-Flip/Momentum-Firmware.git ${FW_PATH}"
+            ;;
+        roguemaster|rm)
+            echo "  git clone --recursive https://github.com/RogueMaster/flipperzero-firmware-wPlugins.git ${FW_PATH}"
+            ;;
+    esac
     exit 1
+fi
+
+# Set firmware-specific defaults if user didn't specify branch/tag
+if [ "$USE_DEFAULT" = "true" ]; then
+    cd "$FW_PATH"
+    git fetch --all --tags --quiet 2>/dev/null
+
+    case $FIRMWARE in
+        official|ofw)
+            # Official: Use latest stable tag (e.g., 1.3.4)
+            TAG=$(git tag | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+            if [ -z "$TAG" ]; then
+                echo "⚠️  Warning: No stable tags found, using release branch"
+                BRANCH="release"
+                TAG=""
+            fi
+            ;;
+        unleashed|ul)
+            # Unleashed: Use release branch
+            BRANCH="release"
+            ;;
+        momentum|mntm|xtreme|xfw)
+            # Momentum: Use release branch
+            BRANCH="release"
+            ;;
+        roguemaster|rm)
+            # RogueMaster: Use release branch
+            BRANCH="release"
+            ;;
+    esac
 fi
 
 # Ensure symlink exists
