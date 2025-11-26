@@ -42,6 +42,25 @@ typedef enum {
     HidDeviceModeCount,
 } HidDeviceMode;
 
+// Mode startup behavior
+typedef enum {
+    HidDeviceModeStartupRemember,       // Remember last used mode
+    HidDeviceModeStartupDefaultNfc,     // Always start with NFC mode
+    HidDeviceModeStartupDefaultRfid,    // Always start with RFID mode
+    HidDeviceModeStartupDefaultNdef,    // Always start with NDEF mode
+    HidDeviceModeStartupDefaultNfcRfid, // Always start with NFC+RFID mode
+    HidDeviceModeStartupDefaultRfidNfc, // Always start with RFID+NFC mode
+    HidDeviceModeStartupCount,
+} HidDeviceModeStartup;
+
+// Output mode
+typedef enum {
+    HidDeviceOutputUsb,      // USB HID only
+    HidDeviceOutputBoth,     // Both USB and BLE HID
+    HidDeviceOutputBle,      // Bluetooth LE HID only
+    HidDeviceOutputCount,
+} HidDeviceOutput;
+
 // Scan state machine
 typedef enum {
     HidDeviceScanStateIdle,           // Not scanning
@@ -50,6 +69,15 @@ typedef enum {
     HidDeviceScanStateDisplaying,     // Showing result before "Sent"
     HidDeviceScanStateCooldown,       // Brief pause after output
 } HidDeviceScanState;
+
+// Vibration levels
+typedef enum {
+    HidDeviceVibrationOff,      // No vibration
+    HidDeviceVibrationLow,      // 30ms
+    HidDeviceVibrationMedium,   // 60ms
+    HidDeviceVibrationHigh,     // 100ms
+    HidDeviceVibrationCount,
+} HidDeviceVibration;
 
 typedef struct {
     Gui* gui;
@@ -69,7 +97,8 @@ typedef struct {
 
     // HID module
     HidDeviceHid* hid;
-    bool bt_enabled;
+    HidDeviceOutput output_mode;
+    bool usb_debug_mode;  // Deprecated: kept for backward compatibility reading only
 
     // NFC module
     HidDeviceNfc* nfc;
@@ -79,6 +108,7 @@ typedef struct {
 
     // Scan mode and state
     HidDeviceMode mode;
+    HidDeviceModeStartup mode_startup_behavior;
     HidDeviceScanState scan_state;
 
     // Scanned data
@@ -92,7 +122,7 @@ typedef struct {
     // Settings
     char delimiter[HID_DEVICE_DELIMITER_MAX_LEN];
     bool append_enter;
-    bool usb_debug_mode;  // Disable USB HID for CLI debugging
+    HidDeviceVibration vibration_level;
 
     // Timers
     FuriTimer* timeout_timer;
@@ -109,4 +139,5 @@ typedef enum {
     HidDeviceViewIdNumberInput,
     HidDeviceViewIdSettings,
     HidDeviceViewIdBtPair,
+    HidDeviceViewIdOutputRestart,  // Restart prompt when switching to USB output
 } HidDeviceViewId;

@@ -3,16 +3,42 @@
 
 enum SettingsIndex {
     SettingsIndexHeader,
+    SettingsIndexOutput,
+    SettingsIndexBtPair,
     SettingsIndexDelimiter,
     SettingsIndexAppendEnter,
-    SettingsIndexUsbDebug,
-    SettingsIndexBtEnable,
-    SettingsIndexBtPair,
+    SettingsIndexModeStartup,
+    SettingsIndexVibration,
 };
 
 const char* const on_off_text[2] = {
     "OFF",
     "ON",
+};
+
+// Vibration level options
+const char* const vibration_text[4] = {
+    "OFF",
+    "Low",
+    "Medium",
+    "High",
+};
+
+// Mode startup behavior options
+const char* const mode_startup_text[6] = {
+    "Remember",
+    "NFC",
+    "RFID",
+    "NDEF",
+    "NFC+RFID",
+    "RFID+NFC",
+};
+
+// Output mode options
+const char* const output_text[3] = {
+    "USB",
+    "Both",
+    "BLE",
 };
 
 // Delimiter options - display names
@@ -71,38 +97,61 @@ static void hid_device_scene_settings_set_append_enter(VariableItem* item) {
     app->append_enter = (index == 1);
 }
 
-static void hid_device_scene_settings_set_usb_debug(VariableItem* item) {
+static void hid_device_scene_settings_set_mode_startup(VariableItem* item) {
     HidDevice* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
-    variable_item_set_current_value_text(item, on_off_text[index]);
-    app->usb_debug_mode = (index == 1);
-
-    // Note: USB HID changes require app restart, show message if needed
-    // For now, just save the setting - it will take effect on next app launch
+    variable_item_set_current_value_text(item, mode_startup_text[index]);
+    app->mode_startup_behavior = (HidDeviceModeStartup)index;
 }
 
-static void hid_device_scene_settings_set_bt_enable(VariableItem* item) {
+static void hid_device_scene_settings_set_vibration(VariableItem* item) {
     HidDevice* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
-    variable_item_set_current_value_text(item, on_off_text[index]);
-    bool new_bt_enabled = (index == 1);
+    variable_item_set_current_value_text(item, vibration_text[index]);
+    app->vibration_level = (HidDeviceVibration)index;
+}
 
-    // Handle BT enable/disable
-    if(new_bt_enabled != app->bt_enabled) {
-        app->bt_enabled = new_bt_enabled;
+static void hid_device_scene_settings_set_output(VariableItem* item) {
+    HidDevice* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
 
-        if(app->bt_enabled) {
+    variable_item_set_current_value_text(item, output_text[index]);
+    HidDeviceOutput new_output_mode = (HidDeviceOutput)index;
+
+    // Handle output mode change
+    if(new_output_mode != app->output_mode) {
+        bool old_usb_enabled = (app->output_mode == HidDeviceOutputUsb || app->output_mode == HidDeviceOutputBoth);
+        bool new_usb_enabled = (new_output_mode == HidDeviceOutputUsb || new_output_mode == HidDeviceOutputBoth);
+        bool old_bt_enabled = (app->output_mode == HidDeviceOutputBle || app->output_mode == HidDeviceOutputBoth);
+        bool new_bt_enabled = (new_output_mode == HidDeviceOutputBle || new_output_mode == HidDeviceOutputBoth);
+
+        // Check if USB status changed (requires app restart)
+        // USB can't be dynamically enabled/disabled without restarting the app
+        if(old_usb_enabled != new_usb_enabled) {
+            // Save the new setting first
+            app->output_mode = new_output_mode;
+            hid_device_save_settings(app);
+
+            // Show restart prompt
+            scene_manager_next_scene(app->scene_manager, HidDeviceSceneUsbDebugRestart);
+            return;  // Don't rebuild settings list yet
+        }
+
+        app->output_mode = new_output_mode;
+
+        // Start/stop BLE HID if needed (when not requiring restart)
+        if(new_bt_enabled && !old_bt_enabled) {
             // Enable BT - start HID
             hid_device_hid_start_bt(app->hid);
-        } else {
+        } else if(!new_bt_enabled && old_bt_enabled) {
             // Disable BT - stop HID
             hid_device_hid_stop_bt(app->hid);
         }
 
         // Rebuild settings list to show/hide "Pair Bluetooth..." option
-        scene_manager_handle_custom_event(app->scene_manager, SettingsIndexBtEnable);
+        scene_manager_handle_custom_event(app->scene_manager, SettingsIndexOutput);
     }
 }
 
@@ -126,11 +175,37 @@ void hid_device_scene_settings_on_enter(void* context) {
         NULL,
         app);
 
-    // Delimiter selector
+    // Output mode selector
+    item = variable_item_list_add(
+        app->variable_item_list,
+        "Output:",
+        HidDeviceOutputCount,
+        hid_device_scene_settings_set_output,
+        app);
+    variable_item_set_current_value_index(item, app->output_mode);
+    variable_item_set_current_value_text(item, output_text[app->output_mode]);
+
+    // Pair Bluetooth... action (only if output mode includes BLE)
+    bool bt_enabled = (app->output_mode == HidDeviceOutputBle || app->output_mode == HidDeviceOutputBoth);
+    if(bt_enabled) {
+        // Get BT connection status to show in label
+        bool bt_connected = hid_device_hid_is_bt_connected(app->hid);
+        const char* bt_status = bt_connected ? "Connected" : "Not paired";
+
+        item = variable_item_list_add(
+            app->variable_item_list,
+            "Pair Bluetooth...",
+            1,
+            NULL,  // No change callback
+            app);
+        variable_item_set_current_value_text(item, bt_status);
+    }
+
+    // Byte Delimiter selector
     uint8_t delimiter_index = get_delimiter_index(app->delimiter);
     item = variable_item_list_add(
         app->variable_item_list,
-        "Delimiter:",
+        "Byte Delimiter:",
         DELIMITER_OPTIONS_COUNT,
         hid_device_scene_settings_set_delimiter,
         app);
@@ -147,40 +222,25 @@ void hid_device_scene_settings_on_enter(void* context) {
     variable_item_set_current_value_index(item, app->append_enter ? 1 : 0);
     variable_item_set_current_value_text(item, on_off_text[app->append_enter ? 1 : 0]);
 
-    // USB Debug Mode toggle
+    // Mode startup behavior selector
     item = variable_item_list_add(
         app->variable_item_list,
-        "USB Debug Mode:",
-        2,
-        hid_device_scene_settings_set_usb_debug,
+        "Start Mode:",
+        HidDeviceModeStartupCount,
+        hid_device_scene_settings_set_mode_startup,
         app);
-    variable_item_set_current_value_index(item, app->usb_debug_mode ? 1 : 0);
-    variable_item_set_current_value_text(item, on_off_text[app->usb_debug_mode ? 1 : 0]);
+    variable_item_set_current_value_index(item, app->mode_startup_behavior);
+    variable_item_set_current_value_text(item, mode_startup_text[app->mode_startup_behavior]);
 
-    // Enable Bluetooth HID toggle
+    // Vibration level selector
     item = variable_item_list_add(
         app->variable_item_list,
-        "Bluetooth HID:",
-        2,
-        hid_device_scene_settings_set_bt_enable,
+        "Vibration:",
+        HidDeviceVibrationCount,
+        hid_device_scene_settings_set_vibration,
         app);
-    variable_item_set_current_value_index(item, app->bt_enabled ? 1 : 0);
-    variable_item_set_current_value_text(item, on_off_text[app->bt_enabled ? 1 : 0]);
-
-    // Pair Bluetooth... action (only if BT is enabled)
-    if(app->bt_enabled) {
-        // Get BT connection status to show in label
-        bool bt_connected = hid_device_hid_is_bt_connected(app->hid);
-        const char* bt_status = bt_connected ? "Connected" : "Not paired";
-
-        item = variable_item_list_add(
-            app->variable_item_list,
-            "Pair Bluetooth...",
-            1,
-            NULL,  // No change callback
-            app);
-        variable_item_set_current_value_text(item, bt_status);
-    }
+    variable_item_set_current_value_index(item, app->vibration_level);
+    variable_item_set_current_value_text(item, vibration_text[app->vibration_level]);
 
     // Set callback for when user clicks on an item
     variable_item_list_set_enter_callback(
@@ -196,8 +256,8 @@ bool hid_device_scene_settings_on_event(void* context, SceneManagerEvent event) 
     bool consumed = false;
 
     if(event.type == SceneManagerEventTypeCustom) {
-        if(event.event == SettingsIndexBtEnable) {
-            // BT toggle changed - rebuild list to show/hide Pair BT option
+        if(event.event == SettingsIndexOutput) {
+            // Output mode changed - rebuild list to show/hide Pair BT option
             variable_item_list_reset(app->variable_item_list);
             hid_device_scene_settings_on_enter(context);
             consumed = true;
