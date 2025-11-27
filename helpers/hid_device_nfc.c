@@ -389,7 +389,8 @@ static bool hid_device_nfc_read_type4_ndef(
         }
 
         if(!select_success) {
-            data->error = HidDeviceNfcErrorUnsupportedType;
+            // Type 4 tag detected but no NDEF app found
+            data->error = HidDeviceNfcErrorNoTextRecord;
             break;
         }
 
@@ -484,17 +485,17 @@ static bool hid_device_nfc_read_type4_ndef(
             break;
         }
 
-        // Limit NDEF read to reasonable size
-        if(ndef_len > 240) {
-            FURI_LOG_W(TAG, "Type 4 NDEF: NDEF too large (%d bytes), limiting to 240", ndef_len);
-            ndef_len = 240;
+        // Limit NDEF read to reasonable size (increased from 240 to support large text records)
+        if(ndef_len > 1024) {
+            FURI_LOG_W(TAG, "Type 4 NDEF: NDEF too large (%d bytes), limiting to 1024", ndef_len);
+            ndef_len = 1024;
         }
 
         FURI_LOG_D(TAG, "Type 4 NDEF: NDEF length = %d bytes", ndef_len);
 
         // Step 6: READ NDEF Message data (skip 2-byte length prefix)
         // Read in chunks if needed (most tags support up to 128-250 bytes per read)
-        uint8_t ndef_data[240];
+        uint8_t ndef_data[1024];
         uint16_t bytes_read = 0;
 
         while(bytes_read < ndef_len) {
@@ -593,10 +594,10 @@ static NfcCommand hid_device_nfc_poller_callback_iso14443_3a(NfcGenericEvent eve
                     instance->last_data.has_ndef = false;
                     instance->last_data.ndef_text[0] = '\0';
 
-                    // ISO14443-3A doesn't support NDEF - if NDEF was requested, mark as unsupported
+                    // ISO14443-3A doesn't support NDEF - if NDEF was requested, mark as not forum compliant
                     if(instance->parse_ndef) {
-                        instance->last_data.error = HidDeviceNfcErrorUnsupportedType;
-                        FURI_LOG_I(TAG, "Got ISO14443-3A UID (unsupported for NDEF), len: %d", instance->last_data.uid_len);
+                        instance->last_data.error = HidDeviceNfcErrorNotForumCompliant;
+                        FURI_LOG_I(TAG, "Got ISO14443-3A UID (not NFC Forum compliant), len: %d", instance->last_data.uid_len);
                     } else {
                         instance->last_data.error = HidDeviceNfcErrorNone;
                         FURI_LOG_I(TAG, "Got ISO14443-3A UID, len: %d", instance->last_data.uid_len);
@@ -752,9 +753,12 @@ static NfcCommand hid_device_nfc_poller_callback_mf_ultralight(NfcGenericEvent e
                         if(instance->parse_ndef && mfu_data->pages_read > 4) {
                             // NDEF data typically starts at page 4 (byte offset 16)
                             // Pages 0-3 are reserved for UID and lock bytes
-                            // We'll read up to 64 pages (256 bytes) for NDEF
+                            // Increased limit from 240 to 1024 to support large text records
                             size_t ndef_data_len = (mfu_data->pages_read - 4) * 4;
-                            if(ndef_data_len > 240) ndef_data_len = 240; // Limit to reasonable size
+                            if(ndef_data_len > 1024) {
+                                FURI_LOG_W(TAG, "Type 2 NDEF: Data too large (%zu bytes), limiting to 1024", ndef_data_len);
+                                ndef_data_len = 1024;
+                            }
 
                             const uint8_t* ndef_data = &mfu_data->page[4].data[0];
 
@@ -869,8 +873,11 @@ static NfcCommand hid_device_nfc_poller_callback_iso15693(NfcGenericEvent event,
                             // NDEF data starts after CC (4 bytes)
                             size_t ndef_data_len = block_data_size - 4;
 
-                            // Limit to reasonable size
-                            if(ndef_data_len > 256) ndef_data_len = 256;
+                            // Limit to reasonable size (increased from 256 to 1024 for large text records)
+                            if(ndef_data_len > 1024) {
+                                FURI_LOG_W(TAG, "Type 5 NDEF: Data too large (%zu bytes), limiting to 1024", ndef_data_len);
+                                ndef_data_len = 1024;
+                            }
 
                             size_t text_len = hid_device_nfc_parse_ndef_text(
                                 &block_data[4], // Skip 4-byte CC

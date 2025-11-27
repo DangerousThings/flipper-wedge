@@ -69,6 +69,7 @@ HidDevice* hid_device_app_alloc() {
     app->delimiter[0] = '\0';  // Empty delimiter by default
     app->append_enter = true;
     app->vibration_level = HidDeviceVibrationMedium;  // Default: Medium vibration
+    app->ndef_max_len = HidDeviceNdefMaxLen250;  // Default: 250 char limit (fast typing)
     app->log_to_sd = false;  // Default: Logging disabled for privacy/performance
     app->restart_pending = false;  // Deprecated field, no longer used
     app->output_switch_pending = false;
@@ -141,12 +142,9 @@ HidDevice* hid_device_app_alloc() {
 void hid_device_switch_output_mode(HidDevice* app, HidDeviceOutput new_mode) {
     furi_assert(app);
 
-    if(new_mode == app->output_mode) {
-        FURI_LOG_I(TAG, "Already in mode %d, no switch needed", new_mode);
-        return;
-    }
-
-    FURI_LOG_I(TAG, "Switching output mode: %d -> %d", app->output_mode, new_mode);
+    // Note: app->output_mode may already equal new_mode (set by settings callback)
+    // but we still need to restart the HID worker with the new profile
+    FURI_LOG_I(TAG, "Switching output mode to: %d", new_mode);
     hid_device_debug_log(TAG, "=== OUTPUT MODE SWITCH: %d -> %d ===",
                         app->output_mode, new_mode);
 
@@ -253,6 +251,9 @@ void hid_device_app_free(HidDevice* app) {
     text_input_free(app->text_input);
 
     view_dispatcher_free(app->view_dispatcher);
+
+    // Restore backlight to auto mode before closing notification service
+    notification_message(app->notification, &sequence_display_backlight_enforce_auto);
 
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_NOTIFICATION);

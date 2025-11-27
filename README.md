@@ -32,8 +32,10 @@ A Flipper Zero application that transforms your device into a contactless tag-to
 ### Configuration
 - **Custom Delimiter**: Choose separator between UID bytes (space, colon, dash, or none)
 - **Enter Key**: Optionally append Enter key after output
-- **Bluetooth Toggle**: Enable/disable Bluetooth HID in settings
-- **USB Debug Mode**: Optional USB mode for debugging
+- **Output Mode**: Switch between USB and Bluetooth HID
+- **NDEF Max Length**: Limit NDEF text output (250/500/1000 chars)
+- **Vibration Level**: Haptic feedback intensity
+- **Scan Logging**: Optional logging to SD card
 
 ## Installation
 
@@ -84,8 +86,11 @@ See [Building from Source](#building-from-source) below.
 Access **Settings** from the main menu to configure:
 - **Delimiter**: Choose separator between bytes (` `, `:`, `-`, or none)
 - **Append Enter**: Toggle Enter key after output
-- **Bluetooth**: Enable/disable Bluetooth HID
-- **USB Debug**: Toggle USB debug mode
+- **Output Mode**: USB or Bluetooth HID (switches dynamically, no restart needed)
+- **NDEF Max Length**: Limit for NDEF text output (250, 500, or 1000 chars)
+- **Vibration Level**: Haptic feedback intensity (Off, Low, Medium, High)
+- **Mode Startup**: Remember last mode or always use a default
+- **Scan Logging**: Enable logging scans to SD card
 
 ### Scan Modes Explained
 
@@ -210,16 +215,21 @@ Contributions are welcome! Please:
 - At least one connection method must be active
 
 ### Tag Not Detected
-- **NFC**: Hold tag flat against back of Flipper, centered
-- **RFID**: Hold tag against back, may need to move around
-- Try different orientations
-- Some tags have weak signals
+- Try a position--wait--move slightly--wait and so on...
 
 ### NDEF Mode Shows "No NDEF Found"
-- Tag must contain properly formatted NDEF text records
+- Tag must contain properly formatted NDEF **text** records
 - Not all NFC tags have NDEF data
-- Use NFC Tools app on phone to write NDEF text records
+- Use NXP's TagWriter app on phone to write NDEF **text** records
 - Switch to NFC mode to read UID instead
+- Type 4 records can be finicky to read due to the many message exchanges required--be patient
+
+### NDEF Mode Isn't Sending What I Expect
+- Check the record that saved--does it match what you entered?
+- **How this works**: Text records are UTF-8 or UTF-16 and must be converted to HID keyboard sequences
+- **Non-ASCII characters are stripped**: Only printable ASCII (0x20-0x7E), tab, and newline are supported
+- **Length limit**: Check Settings → NDEF Max Length (250/500/1000 chars)
+- **What works**: PEM encoded keys, SSH keys, base64, and any ASCII-only text will work perfectly
 
 ### Bluetooth Won't Pair
 - Ensure Bluetooth is enabled in Settings

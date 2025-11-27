@@ -32,7 +32,7 @@
 #define HID_DEVICE_TEXT_STORE_SIZE 128
 #define HID_DEVICE_TEXT_STORE_COUNT 3
 #define HID_DEVICE_DELIMITER_MAX_LEN 8
-#define HID_DEVICE_OUTPUT_MAX_LEN 256
+#define HID_DEVICE_OUTPUT_MAX_LEN 1200  // Increased to support large NDEF text (1024) + UIDs + delimiters
 
 // Scan modes
 typedef enum {
@@ -80,6 +80,14 @@ typedef enum {
     HidDeviceVibrationCount,
 } HidDeviceVibration;
 
+// NDEF text maximum length limits
+typedef enum {
+    HidDeviceNdefMaxLen250,      // 250 characters (recommended for fast typing)
+    HidDeviceNdefMaxLen500,      // 500 characters (covers most use cases)
+    HidDeviceNdefMaxLen1000,     // 1000 characters (maximum, may take several seconds to type)
+    HidDeviceNdefMaxLenCount,
+} HidDeviceNdefMaxLen;
+
 typedef struct {
     Gui* gui;
     NotificationApp* notification;
@@ -124,6 +132,7 @@ typedef struct {
     char delimiter[HID_DEVICE_DELIMITER_MAX_LEN];
     bool append_enter;
     HidDeviceVibration vibration_level;
+    HidDeviceNdefMaxLen ndef_max_len;  // Maximum NDEF text length to type
     bool log_to_sd;        // Log scanned UIDs to SD card
     bool restart_pending;  // True if output mode changed and restart is required
 

@@ -422,20 +422,116 @@ Manages scanning lifecycle across single and combo modes.
 **Location**: Scene startscreen manages state transitions.
 
 #### 5. Settings Persistence
-Settings are saved to `/ext/apps_data/hid_device/settings.txt` using Flipper's storage API.
+
+**CRITICAL**: All user-configurable settings **MUST** persist across app restarts. This is a core requirement.
+
+Settings are saved to `/ext/apps_data/hid_device/hid_device.conf` using Flipper's FlipperFormat API.
 
 **Location**: [helpers/hid_device_storage.c](helpers/hid_device_storage.c)
 
-**Settings**:
-- `delimiter` (string)
-- `append_enter` (bool)
-- `mode` (last used scan mode)
-- `mode_startup_behavior` (enum)
-- `output_mode` (USB/BLE)
-- `vibration_level` (enum)
-- `log_to_sd` (bool)
+**Current Settings** (File Version 5):
+- `delimiter` (string) - Delimiter between fields
+- `append_enter` (bool) - Append Enter key after output
+- `mode` (uint32) - Last used scan mode
+- `mode_startup_behavior` (uint32) - Mode startup behavior enum
+- `output_mode` (uint32) - USB/BLE output mode
+- `vibration_level` (uint32) - Vibration intensity enum
+- `ndef_max_len` (uint32) - NDEF text length limit enum (250/500/1000)
+- `log_to_sd` (bool) - Scan logging to SD card
 
-**Important**: Settings format is plain text key=value. Don't change format without migration logic.
+**Adding a New Setting - Required Steps**:
+
+When adding ANY new user-facing setting, you **MUST** follow this pattern:
+
+1. **Define the setting in app struct** ([hid_device.h](hid_device.h)):
+   ```c
+   typedef struct {
+       // ... existing fields ...
+       YourSettingType your_new_setting;
+   } HidDevice;
+   ```
+
+2. **Add storage key constant** ([helpers/hid_device_storage.h](helpers/hid_device_storage.h)):
+   ```c
+   #define HID_DEVICE_SETTINGS_KEY_YOUR_SETTING "YourSetting"
+   ```
+
+3. **Initialize default value** ([hid_device.c](hid_device.c) in `hid_device_alloc()`):
+   ```c
+   app->your_new_setting = default_value;
+   ```
+
+4. **Save the setting** ([helpers/hid_device_storage.c](helpers/hid_device_storage.c) in `hid_device_save_settings()`):
+   ```c
+   // For uint32/enum:
+   uint32_t your_setting = app->your_new_setting;
+   flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_YOUR_SETTING, &your_setting, 1);
+
+   // For bool:
+   flipper_format_write_bool(fff_file, HID_DEVICE_SETTINGS_KEY_YOUR_SETTING, &app->your_new_setting, 1);
+
+   // For string:
+   flipper_format_write_string_cstr(fff_file, HID_DEVICE_SETTINGS_KEY_YOUR_SETTING, app->your_new_setting);
+   ```
+
+5. **Load the setting** ([helpers/hid_device_storage.c](helpers/hid_device_storage.c) in `hid_device_read_settings()`):
+   ```c
+   // For uint32/enum:
+   uint32_t your_setting = default_value;
+   if(flipper_format_read_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_YOUR_SETTING, &your_setting, 1)) {
+       // Validate range if it's an enum
+       if(your_setting < YourSettingEnumCount) {
+           app->your_new_setting = (YourSettingEnum)your_setting;
+       }
+   }
+
+   // For bool:
+   flipper_format_read_bool(fff_file, HID_DEVICE_SETTINGS_KEY_YOUR_SETTING, &app->your_new_setting, 1);
+   ```
+
+6. **Save immediately in callback** ([scenes/hid_device_scene_settings.c](scenes/hid_device_scene_settings.c)):
+   ```c
+   static void your_setting_callback(VariableItem* item) {
+       HidDevice* app = variable_item_get_context(item);
+       uint8_t index = variable_item_get_current_value_index(item);
+
+       variable_item_set_current_value_text(item, your_text_array[index]);
+       app->your_new_setting = (YourSettingEnum)index;
+       hid_device_save_settings(app);  // CRITICAL: Save immediately
+   }
+   ```
+
+   **CRITICAL**: Always call `hid_device_save_settings(app)` immediately in the callback.
+   - **DO NOT** rely on Back button save alone (line 390) - it's a fallback only
+   - **Reason**: If app exits abnormally (crash, home button, etc.), settings would be lost
+   - **Pattern**: All settings callbacks MUST save immediately after updating the value
+
+**Example: NDEF Max Length Setting**
+
+See [helpers/hid_device_storage.c:65-66](helpers/hid_device_storage.c#L65-L66) (save) and [helpers/hid_device_storage.c:200-207](helpers/hid_device_storage.c#L200-L207) (load) for a complete example.
+
+**File Versioning**:
+
+- Current version: **5** ([helpers/hid_device_storage.h:9](helpers/hid_device_storage.h#L9))
+- Increment version if you change the format or add required fields
+- Old config files (version < 5) are rejected and defaults are used
+- After first save, new version file is created
+
+**Important Notes**:
+
+- Settings are saved in **FlipperFormat** (not plain text key=value)
+- **Settings MUST save immediately in callback** - never rely only on Back button save
+- Settings are loaded in `hid_device_alloc()` after defaults are set
+- **Always provide a sensible default** for backward compatibility
+- **Always validate loaded values** (range checks for enums)
+- Don't skip the validation step - prevents crashes from corrupted files
+- **CRITICAL**: Always check return values from `flipper_format_write_*` functions!
+  - They return `bool` and can fail silently
+  - If unchecked, some settings save while others fail randomly
+  - Use proper error handling with goto cleanup pattern (see [storage.c:50-110](helpers/hid_device_storage.c#L50-L110))
+- **Lessons learned**:
+  - Not saving immediately caused NDEF max length to always reset to 250
+  - Not checking write return values caused random settings to not persist
 
 ---
 

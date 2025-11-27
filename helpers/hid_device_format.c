@@ -118,3 +118,43 @@ void hid_device_format_output(
 
     output[pos] = '\0';
 }
+
+size_t hid_device_sanitize_text(
+    const char* input,
+    char* output,
+    size_t output_size,
+    size_t max_len) {
+
+    if(!input || !output || output_size == 0) {
+        if(output && output_size > 0) {
+            output[0] = '\0';
+        }
+        return 0;
+    }
+
+    size_t out_pos = 0;
+    size_t in_pos = 0;
+    size_t effective_max = (max_len == 0) ? output_size - 1 : max_len;
+
+    // Ensure we don't exceed output buffer
+    if(effective_max >= output_size) {
+        effective_max = output_size - 1;
+    }
+
+    // Copy only printable ASCII characters (0x20-0x7E)
+    while(input[in_pos] != '\0' && out_pos < effective_max) {
+        char c = input[in_pos];
+
+        // Allow printable ASCII: space (0x20) through tilde (0x7E)
+        // Also allow tab (0x09) and newline (0x0A) which HID can handle
+        if((c >= 0x20 && c <= 0x7E) || c == '\t' || c == '\n') {
+            output[out_pos++] = c;
+        }
+        // Skip non-printable characters (including control chars and extended ASCII)
+
+        in_pos++;
+    }
+
+    output[out_pos] = '\0';
+    return out_pos;
+}

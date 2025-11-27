@@ -9,6 +9,7 @@ enum SettingsIndex {
     SettingsIndexAppendEnter,
     SettingsIndexModeStartup,
     SettingsIndexVibration,
+    SettingsIndexNdefMaxLen,
     SettingsIndexLogToSd,
 };
 
@@ -23,6 +24,13 @@ const char* const vibration_text[4] = {
     "Low",
     "Medium",
     "High",
+};
+
+// NDEF max length options
+const char* const ndef_max_len_text[3] = {
+    "250 chars",
+    "500 chars",
+    "1000 chars",
 };
 
 // Mode startup behavior options
@@ -95,6 +103,7 @@ static void hid_device_scene_settings_set_append_enter(VariableItem* item) {
 
     variable_item_set_current_value_text(item, on_off_text[index]);
     app->append_enter = (index == 1);
+    hid_device_save_settings(app);  // Save immediately to persist across app restarts
 }
 
 static void hid_device_scene_settings_set_mode_startup(VariableItem* item) {
@@ -103,6 +112,7 @@ static void hid_device_scene_settings_set_mode_startup(VariableItem* item) {
 
     variable_item_set_current_value_text(item, mode_startup_text[index]);
     app->mode_startup_behavior = (HidDeviceModeStartup)index;
+    hid_device_save_settings(app);  // Save immediately to persist across app restarts
 }
 
 static void hid_device_scene_settings_set_vibration(VariableItem* item) {
@@ -111,14 +121,29 @@ static void hid_device_scene_settings_set_vibration(VariableItem* item) {
 
     variable_item_set_current_value_text(item, vibration_text[index]);
     app->vibration_level = (HidDeviceVibration)index;
+    hid_device_save_settings(app);  // Save immediately to persist across app restarts
+}
+
+static void hid_device_scene_settings_set_ndef_max_len(VariableItem* item) {
+    HidDevice* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+
+    FURI_LOG_I("Settings", "NDEF callback: index=%d, old app value=%d", index, app->ndef_max_len);
+    variable_item_set_current_value_text(item, ndef_max_len_text[index]);
+    app->ndef_max_len = (HidDeviceNdefMaxLen)index;
+    FURI_LOG_I("Settings", "NDEF callback: new app value=%d, about to save", app->ndef_max_len);
+    hid_device_save_settings(app);  // Save immediately to persist across app restarts
 }
 
 static void hid_device_scene_settings_set_log_to_sd(VariableItem* item) {
     HidDevice* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
+    FURI_LOG_I("Settings", "LogToSD callback: index=%d, old app value=%d", index, app->log_to_sd);
     variable_item_set_current_value_text(item, on_off_text[index]);
     app->log_to_sd = (index == 1);
+    FURI_LOG_I("Settings", "LogToSD callback: new app value=%d, about to save", app->log_to_sd);
+    hid_device_save_settings(app);  // Save immediately to persist across app restarts
 }
 
 static void hid_device_scene_settings_set_output(VariableItem* item) {
@@ -137,8 +162,12 @@ static void hid_device_scene_settings_set_output(VariableItem* item) {
         // Set flag for tick callback to process (worker thread handles HID lifecycle)
         app->output_switch_pending = true;
         app->output_switch_target = new_output_mode;
-        // DON'T update app->output_mode here - let hid_device_switch_output_mode() do it
-        // after the actual switch completes (otherwise switch function thinks we're already there)
+
+        // IMPORTANT: Update output_mode immediately so it persists if user exits
+        // before the async switch completes. The switch function checks the pending
+        // flag, not the mode equality, so this is safe.
+        app->output_mode = new_output_mode;
+        hid_device_save_settings(app);
 
         // Rebuild settings list to show/hide "Pair Bluetooth..." option
         scene_manager_handle_custom_event(app->scene_manager, SettingsIndexOutput);
@@ -262,6 +291,16 @@ void hid_device_scene_settings_on_enter(void* context) {
         app);
     variable_item_set_current_value_index(item, app->vibration_level);
     variable_item_set_current_value_text(item, vibration_text[app->vibration_level]);
+
+    // NDEF max length selector
+    item = variable_item_list_add(
+        app->variable_item_list,
+        "NDEF Max Len:",
+        HidDeviceNdefMaxLenCount,
+        hid_device_scene_settings_set_ndef_max_len,
+        app);
+    variable_item_set_current_value_index(item, app->ndef_max_len);
+    variable_item_set_current_value_text(item, ndef_max_len_text[app->ndef_max_len]);
 
     // Log to SD toggle
     item = variable_item_list_add(

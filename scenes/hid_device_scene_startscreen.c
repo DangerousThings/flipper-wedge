@@ -41,8 +41,9 @@ static void hid_device_scene_startscreen_display_timer_callback(void* context) {
             HidDeviceStartscreenModel * model,
             {
                 // Error messages don't need "Sent" confirmation
-                is_error = (strstr(model->status_text, "Unsupported") != NULL) ||
-                          (strstr(model->status_text, "No Text Record") != NULL);
+                is_error = (strstr(model->status_text, "Not NFC Forum Compliant") != NULL) ||
+                          (strstr(model->status_text, "Unsupported NFC Forum Type") != NULL) ||
+                          (strstr(model->status_text, "NDEF Not Found") != NULL);
             },
             false);
 
@@ -128,10 +129,49 @@ static void hid_device_scene_startscreen_update_status(HidDevice* app) {
 static void hid_device_scene_startscreen_output_and_reset(HidDevice* app) {
     FURI_LOG_I("HidDeviceScene", "output_and_reset: nfc_uid_len=%d, rfid_uid_len=%d", app->nfc_uid_len, app->rfid_uid_len);
 
+    // Determine max NDEF length from settings
+    size_t max_ndef_len = 0;
+    switch(app->ndef_max_len) {
+        case HidDeviceNdefMaxLen250:
+            max_ndef_len = 250;
+            break;
+        case HidDeviceNdefMaxLen500:
+            max_ndef_len = 500;
+            break;
+        case HidDeviceNdefMaxLen1000:
+            max_ndef_len = 1000;
+            break;
+        default:
+            max_ndef_len = 250;
+            break;
+    }
+
+    // Sanitize NDEF text if present (remove non-printable chars, apply length limit)
+    char sanitized_ndef[HID_DEVICE_NDEF_MAX_LEN];
+    if(app->ndef_text[0] != '\0') {
+        size_t original_len = strlen(app->ndef_text);
+        size_t sanitized_len = hid_device_sanitize_text(
+            app->ndef_text,
+            sanitized_ndef,
+            sizeof(sanitized_ndef),
+            max_ndef_len);
+
+        FURI_LOG_I("HidDeviceScene", "NDEF text: original=%zu, sanitized=%zu, limit=%zu",
+                   original_len, sanitized_len, max_ndef_len);
+
+        // Warn if text was truncated
+        if(max_ndef_len > 0 && original_len > max_ndef_len) {
+            FURI_LOG_W("HidDeviceScene", "NDEF text truncated from %zu to %zu chars",
+                       original_len, sanitized_len);
+        }
+    } else {
+        sanitized_ndef[0] = '\0';
+    }
+
     // Format the output based on mode
     if(app->mode == HidDeviceModeNdef) {
         // NDEF mode: output only NDEF text (no UID)
-        snprintf(app->output_buffer, sizeof(app->output_buffer), "%s", app->ndef_text);
+        snprintf(app->output_buffer, sizeof(app->output_buffer), "%s", sanitized_ndef);
     } else {
         // Other modes: format UIDs (and NDEF if present)
         bool nfc_first = (app->mode == HidDeviceModeNfc ||
@@ -142,7 +182,7 @@ static void hid_device_scene_startscreen_output_and_reset(HidDevice* app) {
             app->nfc_uid_len,
             app->rfid_uid_len > 0 ? app->rfid_uid : NULL,
             app->rfid_uid_len,
-            app->ndef_text,
+            sanitized_ndef,  // Use sanitized text
             app->delimiter,
             nfc_first,
             app->output_buffer,
@@ -153,9 +193,40 @@ static void hid_device_scene_startscreen_output_and_reset(HidDevice* app) {
     hid_device_startscreen_set_uid_text(app->hid_device_startscreen, app->output_buffer);
     hid_device_startscreen_set_display_state(app->hid_device_startscreen, HidDeviceDisplayStateResult);
 
-    // Type the output via HID
+    // Type the output via HID (with chunking for long text)
     if(hid_device_hid_is_connected(hid_device_get_hid(app))) {
-        hid_device_hid_type_string(hid_device_get_hid(app), app->output_buffer);
+        size_t text_len = strlen(app->output_buffer);
+
+        // If text is long (>100 chars), show progress and type in chunks
+        if(text_len > 100) {
+            const size_t chunk_size = 100;
+            size_t chunks = (text_len + chunk_size - 1) / chunk_size;
+
+            for(size_t i = 0; i < chunks; i++) {
+                // Update progress
+                char progress_text[32];
+                snprintf(progress_text, sizeof(progress_text), "Typing %zu/%zu...", i + 1, chunks);
+                hid_device_startscreen_set_status_text(app->hid_device_startscreen, progress_text);
+
+                // Type chunk
+                size_t chunk_start = i * chunk_size;
+                size_t chunk_len = (chunk_start + chunk_size > text_len) ?
+                                   (text_len - chunk_start) : chunk_size;
+
+                char chunk[101];  // 100 + null terminator
+                memcpy(chunk, app->output_buffer + chunk_start, chunk_len);
+                chunk[chunk_len] = '\0';
+
+                hid_device_hid_type_string(hid_device_get_hid(app), chunk);
+
+                // Small delay between chunks (let HID catch up)
+                furi_delay_ms(50);
+            }
+        } else {
+            // Short text, type normally
+            hid_device_hid_type_string(hid_device_get_hid(app), app->output_buffer);
+        }
+
         if(app->append_enter) {
             hid_device_hid_press_enter(hid_device_get_hid(app));
         }
@@ -261,8 +332,9 @@ void hid_device_scene_startscreen_on_enter(void* context) {
     // Update HID connection status
     hid_device_scene_startscreen_update_status(app);
 
-    // Keep display backlight on while using the app
-    notification_message(app->notification, &sequence_display_backlight_enforce_on);
+    // Turn on backlight (but don't enforce - let system timeout work)
+    // The app_alloc already turned it on initially, so this is just a wake-up
+    notification_message(app->notification, &sequence_display_backlight_on);
 
     view_dispatcher_switch_to_view(app->view_dispatcher, HidDeviceViewIdStartscreen);
 
@@ -312,15 +384,18 @@ bool hid_device_scene_startscreen_on_event(void* context, SceneManagerEvent even
                 } else {
                     // No NDEF text - determine error message based on nfc_error field
                     const char* error_msg;
-                    if(app->nfc_error == HidDeviceNfcErrorUnsupportedType) {
+                    if(app->nfc_error == HidDeviceNfcErrorNotForumCompliant) {
+                        error_msg = "Not NFC Forum Compliant";
+                        FURI_LOG_D("HidDeviceScene", "NDEF mode - Not NFC Forum compliant (e.g., MIFARE Classic)");
+                    } else if(app->nfc_error == HidDeviceNfcErrorUnsupportedType) {
                         error_msg = "Unsupported NFC Forum Type";
                         FURI_LOG_D("HidDeviceScene", "NDEF mode - Unsupported NFC Forum Type");
                     } else if(app->nfc_error == HidDeviceNfcErrorNoTextRecord) {
-                        error_msg = "No Text Record Found";
-                        FURI_LOG_D("HidDeviceScene", "NDEF mode - No text record found");
+                        error_msg = "NDEF Not Found";
+                        FURI_LOG_D("HidDeviceScene", "NDEF mode - NDEF not found");
                     } else {
                         // Fallback for any other case
-                        error_msg = "No Text Record Found";
+                        error_msg = "NDEF Not Found";
                         FURI_LOG_D("HidDeviceScene", "NDEF mode - Unknown error");
                     }
 

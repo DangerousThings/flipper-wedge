@@ -41,3 +41,18 @@ void hid_device_format_output(
     bool nfc_first,
     char* output,
     size_t output_size);
+
+/** Sanitize text for HID keyboard typing
+ * Removes non-printable characters and truncates to max length
+ *
+ * @param input Input text (may contain binary data)
+ * @param output Output buffer for sanitized text
+ * @param output_size Size of output buffer
+ * @param max_len Maximum characters to keep (0 = no limit)
+ * @return Number of characters in sanitized output
+ */
+size_t hid_device_sanitize_text(
+    const char* input,
+    char* output,
+    size_t output_size,
+    size_t max_len);

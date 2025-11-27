@@ -10,12 +10,13 @@
 #include <nfc/protocols/mf_ultralight/mf_ultralight_poller.h>
 
 #define HID_DEVICE_NFC_UID_MAX_LEN 10
-#define HID_DEVICE_NDEF_MAX_LEN 256
+#define HID_DEVICE_NDEF_MAX_LEN 1024  // Buffer size (max user setting is 1000 chars, +24 for safety)
 
 typedef struct HidDeviceNfc HidDeviceNfc;
 
 typedef enum {
-    HidDeviceNfcErrorNone,           // Success
+    HidDeviceNfcErrorNone,            // Success
+    HidDeviceNfcErrorNotForumCompliant, // Tag is not NFC Forum compliant (e.g., MIFARE Classic)
     HidDeviceNfcErrorUnsupportedType, // Tag detected but unsupported NFC Forum Type for NDEF
     HidDeviceNfcErrorNoTextRecord,    // Supported type but no NDEF text record found
 } HidDeviceNfcError;

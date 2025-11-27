@@ -46,33 +46,69 @@ void hid_device_save_settings(void* context) {
         return;
     }
 
-    // Store Settings
-    flipper_format_write_header_cstr(
-        fff_file, HID_DEVICE_SETTINGS_HEADER, HID_DEVICE_SETTINGS_FILE_VERSION);
-    flipper_format_write_string_cstr(
-        fff_file, HID_DEVICE_SETTINGS_KEY_DELIMITER, app->delimiter);
-    flipper_format_write_bool(
-        fff_file, HID_DEVICE_SETTINGS_KEY_APPEND_ENTER, &app->append_enter, 1);
+    // Store Settings - Track errors but write all settings
+    bool save_success = true;
+
+    if(!flipper_format_write_header_cstr(
+        fff_file, HID_DEVICE_SETTINGS_HEADER, HID_DEVICE_SETTINGS_FILE_VERSION)) {
+        FURI_LOG_E(TAG, "Failed to write header");
+        save_success = false;
+    }
+    if(!flipper_format_write_string_cstr(
+        fff_file, HID_DEVICE_SETTINGS_KEY_DELIMITER, app->delimiter)) {
+        FURI_LOG_E(TAG, "Failed to write delimiter");
+        save_success = false;
+    }
+    if(!flipper_format_write_bool(
+        fff_file, HID_DEVICE_SETTINGS_KEY_APPEND_ENTER, &app->append_enter, 1)) {
+        FURI_LOG_E(TAG, "Failed to write append_enter");
+        save_success = false;
+    }
     uint32_t mode = app->mode;
-    flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE, &mode, 1);
+    if(!flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE, &mode, 1)) {
+        FURI_LOG_E(TAG, "Failed to write mode");
+        save_success = false;
+    }
     uint32_t mode_startup = app->mode_startup_behavior;
-    flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE_STARTUP, &mode_startup, 1);
+    if(!flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_MODE_STARTUP, &mode_startup, 1)) {
+        FURI_LOG_E(TAG, "Failed to write mode_startup");
+        save_success = false;
+    }
     uint32_t output_mode = app->output_mode;
-    flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_OUTPUT_MODE, &output_mode, 1);
+    if(!flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_OUTPUT_MODE, &output_mode, 1)) {
+        FURI_LOG_E(TAG, "Failed to write output_mode");
+        save_success = false;
+    }
     // Note: USB Debug Mode no longer saved (deprecated in favor of Output selector)
     uint32_t vibration = app->vibration_level;
-    flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_VIBRATION, &vibration, 1);
-    flipper_format_write_bool(fff_file, HID_DEVICE_SETTINGS_KEY_LOG_TO_SD, &app->log_to_sd, 1);
+    if(!flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_VIBRATION, &vibration, 1)) {
+        FURI_LOG_E(TAG, "Failed to write vibration");
+        save_success = false;
+    }
+    uint32_t ndef_max_len = app->ndef_max_len;
+    FURI_LOG_I(TAG, "Saving NDEF max len: %lu", ndef_max_len);
+    if(!flipper_format_write_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_NDEF_MAX_LEN, &ndef_max_len, 1)) {
+        FURI_LOG_E(TAG, "Failed to write ndef_max_len");
+        save_success = false;
+    }
+    if(!flipper_format_write_bool(fff_file, HID_DEVICE_SETTINGS_KEY_LOG_TO_SD, &app->log_to_sd, 1)) {
+        FURI_LOG_E(TAG, "Failed to write log_to_sd");
+        save_success = false;
+    }
 
     if(!flipper_format_rewind(fff_file)) {
-        hid_device_close_config_file(fff_file);
         FURI_LOG_E(TAG, "Rewind error");
-        hid_device_close_storage();
-        return;
+        save_success = false;
     }
 
     hid_device_close_config_file(fff_file);
     hid_device_close_storage();
+
+    if(save_success) {
+        FURI_LOG_I(TAG, "Settings saved successfully");
+    } else {
+        FURI_LOG_E(TAG, "Failed to save one or more settings!");
+    }
 }
 
 void hid_device_read_settings(void* context) {
@@ -104,10 +140,11 @@ void hid_device_read_settings(void* context) {
         return;
     }
 
+    FURI_LOG_I(TAG, "Config file version: %lu (current: %d)", file_version, HID_DEVICE_SETTINGS_FILE_VERSION);
     furi_string_free(temp_str);
 
     if(file_version < HID_DEVICE_SETTINGS_FILE_VERSION) {
-        FURI_LOG_I(TAG, "old config version, will be removed.");
+        FURI_LOG_W(TAG, "Old config version %lu (expected %d), settings will not be loaded", file_version, HID_DEVICE_SETTINGS_FILE_VERSION);
         hid_device_close_config_file(fff_file);
         hid_device_close_storage();
         return;
@@ -166,22 +203,13 @@ void hid_device_read_settings(void* context) {
     }
 
     // Read output mode setting (default to USB)
-    // Note: We removed "Both" mode. Old settings migration:
-    // Old 0 (USB) -> New 0 (USB)
-    // Old 1 (Both) -> New 0 (USB) - default to USB for backward compat
-    // Old 2 (BLE) -> New 1 (BLE)
+    // Note: Old file versions (< 5) are rejected above, so no migration needed
+    // Current format: 0 = USB, 1 = BLE
     uint32_t output_mode = HidDeviceOutputUsb;  // Default to USB
     if(flipper_format_read_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_OUTPUT_MODE, &output_mode, 1)) {
-        // Migrate old "Both" (1) to USB, old BLE (2) to new BLE (1)
-        if(output_mode == 0) {
-            // Old USB -> New USB
-            app->output_mode = HidDeviceOutputUsb;
-        } else if(output_mode == 1) {
-            // Old "Both" -> New USB (safer default)
-            app->output_mode = HidDeviceOutputUsb;
-        } else if(output_mode == 2) {
-            // Old BLE -> New BLE (now index 1)
-            app->output_mode = HidDeviceOutputBle;
+        // Validate output_mode is within valid range
+        if(output_mode < HidDeviceOutputCount) {
+            app->output_mode = (HidDeviceOutput)output_mode;
         } else {
             // Invalid value - default to USB
             FURI_LOG_W(TAG, "Invalid output mode %lu, defaulting to USB", output_mode);
@@ -189,17 +217,8 @@ void hid_device_read_settings(void* context) {
         }
     }
 
-    // Final validation: ensure output_mode is within valid range
-    if(app->output_mode >= HidDeviceOutputCount) {
-        FURI_LOG_E(TAG, "Output mode %d out of range, forcing to USB", app->output_mode);
-        app->output_mode = HidDeviceOutputUsb;
-    }
-
-    // Read USB debug mode setting (backward compatibility only - no longer used)
-    // Old configs may have this setting; we read it to avoid errors but don't apply it
-    bool usb_debug = false;
-    flipper_format_read_bool(fff_file, HID_DEVICE_SETTINGS_KEY_USB_DEBUG, &usb_debug, 1);
-    // Note: usb_debug_mode is deprecated; Output selector (USB/BLE/Both) replaces this functionality
+    // Note: USB Debug Mode is deprecated and no longer read (removed to prevent breaking sequential reads)
+    // Old file versions (< 5) with UsbDebug are rejected at line 113-117
 
     // Read vibration level setting (default to Medium for backward compatibility)
     uint32_t vibration = HidDeviceVibrationMedium;
@@ -208,6 +227,22 @@ void hid_device_read_settings(void* context) {
         if(vibration < HidDeviceVibrationCount) {
             app->vibration_level = (HidDeviceVibration)vibration;
         }
+    }
+
+    // Read NDEF max length setting (default to 250 chars for fast typing)
+    uint32_t ndef_max_len = HidDeviceNdefMaxLen250;
+    if(flipper_format_read_uint32(fff_file, HID_DEVICE_SETTINGS_KEY_NDEF_MAX_LEN, &ndef_max_len, 1)) {
+        FURI_LOG_I(TAG, "Loaded NDEF max len from file: %lu", ndef_max_len);
+        // Validate NDEF max length is within valid range
+        // Migrate old "unlimited" value (2) to new max value (2)
+        if(ndef_max_len < HidDeviceNdefMaxLenCount) {
+            app->ndef_max_len = (HidDeviceNdefMaxLen)ndef_max_len;
+            FURI_LOG_I(TAG, "Set NDEF max len to: %d", app->ndef_max_len);
+        } else {
+            FURI_LOG_E(TAG, "Invalid NDEF max len %lu (max %d), using default", ndef_max_len, HidDeviceNdefMaxLenCount);
+        }
+    } else {
+        FURI_LOG_W(TAG, "NDEF max len not found in file, using default 250");
     }
 
     // Read log to SD setting (default to OFF for privacy/performance)

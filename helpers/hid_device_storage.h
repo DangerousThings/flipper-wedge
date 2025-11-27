@@ -18,6 +18,7 @@
 #define HID_DEVICE_SETTINGS_KEY_OUTPUT_MODE "OutputMode"
 #define HID_DEVICE_SETTINGS_KEY_USB_DEBUG "UsbDebug"
 #define HID_DEVICE_SETTINGS_KEY_VIBRATION "Vibration"
+#define HID_DEVICE_SETTINGS_KEY_NDEF_MAX_LEN "NdefMaxLen"
 #define HID_DEVICE_SETTINGS_KEY_LOG_TO_SD "LogToSd"
 
 void hid_device_save_settings(void* context);
