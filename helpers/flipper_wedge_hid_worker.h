@@ -1,56 +1,56 @@
 #pragma once
 
 #include <furi.h>
-#include "hid_device_hid.h"
+#include "flipper_wedge_hid.h"
 
-typedef struct HidDeviceHidWorker HidDeviceHidWorker;
+typedef struct FlipperWedgeHidWorker FlipperWedgeHidWorker;
 
 typedef enum {
-    HidDeviceHidWorkerModeUsb,
-    HidDeviceHidWorkerModeBle,
-} HidDeviceHidWorkerMode;
+    FlipperWedgeHidWorkerModeUsb,
+    FlipperWedgeHidWorkerModeBle,
+} FlipperWedgeHidWorkerMode;
 
 /** Allocate HID worker
  * Worker thread owns the HID interface lifecycle
  *
- * @return HidDeviceHidWorker instance
+ * @return FlipperWedgeHidWorker instance
  */
-HidDeviceHidWorker* hid_device_hid_worker_alloc(void);
+FlipperWedgeHidWorker* flipper_wedge_hid_worker_alloc(void);
 
 /** Free HID worker
  * Stops worker thread and cleans up HID interface
  *
- * @param worker HidDeviceHidWorker instance
+ * @param worker FlipperWedgeHidWorker instance
  */
-void hid_device_hid_worker_free(HidDeviceHidWorker* worker);
+void flipper_wedge_hid_worker_free(FlipperWedgeHidWorker* worker);
 
 /** Start HID worker with specified mode
  * Creates worker thread that initializes HID interface
  *
- * @param worker HidDeviceHidWorker instance
+ * @param worker FlipperWedgeHidWorker instance
  * @param mode USB or BLE mode
  */
-void hid_device_hid_worker_start(HidDeviceHidWorker* worker, HidDeviceHidWorkerMode mode);
+void flipper_wedge_hid_worker_start(FlipperWedgeHidWorker* worker, FlipperWedgeHidWorkerMode mode);
 
 /** Stop HID worker
  * Signals worker thread to exit and deinit HID interface
  * Blocks until worker thread exits
  *
- * @param worker HidDeviceHidWorker instance
+ * @param worker FlipperWedgeHidWorker instance
  */
-void hid_device_hid_worker_stop(HidDeviceHidWorker* worker);
+void flipper_wedge_hid_worker_stop(FlipperWedgeHidWorker* worker);
 
 /** Get HID instance from worker
  * Returns the HID interface managed by the worker
  *
- * @param worker HidDeviceHidWorker instance
- * @return HidDeviceHid instance
+ * @param worker FlipperWedgeHidWorker instance
+ * @return FlipperWedgeHid instance
  */
-HidDeviceHid* hid_device_hid_worker_get_hid(HidDeviceHidWorker* worker);
+FlipperWedgeHid* flipper_wedge_hid_worker_get_hid(FlipperWedgeHidWorker* worker);
 
 /** Check if worker is running
  *
- * @param worker HidDeviceHidWorker instance
+ * @param worker FlipperWedgeHidWorker instance
  * @return true if worker thread is active
  */
-bool hid_device_hid_worker_is_running(HidDeviceHidWorker* worker);
+bool flipper_wedge_hid_worker_is_running(FlipperWedgeHidWorker* worker);

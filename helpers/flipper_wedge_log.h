@@ -11,4 +11,4 @@
  *
  * @param data The formatted scan data (UID or NDEF text)
  */
-void hid_device_log_scan(const char* data);
+void flipper_wedge_log_scan(const char* data);

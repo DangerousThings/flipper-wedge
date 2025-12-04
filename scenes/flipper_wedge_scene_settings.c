@@ -1,4 +1,4 @@
-#include "../hid_device.h"
+#include "../flipper_wedge.h"
 #include <lib/toolbox/value_index.h>
 
 enum SettingsIndex {
@@ -85,79 +85,79 @@ static uint8_t get_delimiter_index(const char* delimiter) {
     return 0; // Default to empty if not found
 }
 
-static void hid_device_scene_settings_set_delimiter(VariableItem* item) {
-    HidDevice* app = variable_item_get_context(item);
+static void flipper_wedge_scene_settings_set_delimiter(VariableItem* item) {
+    FlipperWedge* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
     // Update delimiter in app
-    strncpy(app->delimiter, delimiter_values[index], HID_DEVICE_DELIMITER_MAX_LEN - 1);
-    app->delimiter[HID_DEVICE_DELIMITER_MAX_LEN - 1] = '\0';
+    strncpy(app->delimiter, delimiter_values[index], FLIPPER_WEDGE_DELIMITER_MAX_LEN - 1);
+    app->delimiter[FLIPPER_WEDGE_DELIMITER_MAX_LEN - 1] = '\0';
 
     // Update display text
     variable_item_set_current_value_text(item, delimiter_names[index]);
 }
 
-static void hid_device_scene_settings_set_append_enter(VariableItem* item) {
-    HidDevice* app = variable_item_get_context(item);
+static void flipper_wedge_scene_settings_set_append_enter(VariableItem* item) {
+    FlipperWedge* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
     variable_item_set_current_value_text(item, on_off_text[index]);
     app->append_enter = (index == 1);
-    hid_device_save_settings(app);  // Save immediately to persist across app restarts
+    flipper_wedge_save_settings(app);  // Save immediately to persist across app restarts
 }
 
-static void hid_device_scene_settings_set_mode_startup(VariableItem* item) {
-    HidDevice* app = variable_item_get_context(item);
+static void flipper_wedge_scene_settings_set_mode_startup(VariableItem* item) {
+    FlipperWedge* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
     variable_item_set_current_value_text(item, mode_startup_text[index]);
-    app->mode_startup_behavior = (HidDeviceModeStartup)index;
-    hid_device_save_settings(app);  // Save immediately to persist across app restarts
+    app->mode_startup_behavior = (FlipperWedgeModeStartup)index;
+    flipper_wedge_save_settings(app);  // Save immediately to persist across app restarts
 }
 
-static void hid_device_scene_settings_set_vibration(VariableItem* item) {
-    HidDevice* app = variable_item_get_context(item);
+static void flipper_wedge_scene_settings_set_vibration(VariableItem* item) {
+    FlipperWedge* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
     variable_item_set_current_value_text(item, vibration_text[index]);
-    app->vibration_level = (HidDeviceVibration)index;
-    hid_device_save_settings(app);  // Save immediately to persist across app restarts
+    app->vibration_level = (FlipperWedgeVibration)index;
+    flipper_wedge_save_settings(app);  // Save immediately to persist across app restarts
 }
 
-static void hid_device_scene_settings_set_ndef_max_len(VariableItem* item) {
-    HidDevice* app = variable_item_get_context(item);
+static void flipper_wedge_scene_settings_set_ndef_max_len(VariableItem* item) {
+    FlipperWedge* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
     FURI_LOG_I("Settings", "NDEF callback: index=%d, old app value=%d", index, app->ndef_max_len);
     variable_item_set_current_value_text(item, ndef_max_len_text[index]);
-    app->ndef_max_len = (HidDeviceNdefMaxLen)index;
+    app->ndef_max_len = (FlipperWedgeNdefMaxLen)index;
     FURI_LOG_I("Settings", "NDEF callback: new app value=%d, about to save", app->ndef_max_len);
-    hid_device_save_settings(app);  // Save immediately to persist across app restarts
+    flipper_wedge_save_settings(app);  // Save immediately to persist across app restarts
 }
 
-static void hid_device_scene_settings_set_log_to_sd(VariableItem* item) {
-    HidDevice* app = variable_item_get_context(item);
+static void flipper_wedge_scene_settings_set_log_to_sd(VariableItem* item) {
+    FlipperWedge* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
     FURI_LOG_I("Settings", "LogToSD callback: index=%d, old app value=%d", index, app->log_to_sd);
     variable_item_set_current_value_text(item, on_off_text[index]);
     app->log_to_sd = (index == 1);
     FURI_LOG_I("Settings", "LogToSD callback: new app value=%d, about to save", app->log_to_sd);
-    hid_device_save_settings(app);  // Save immediately to persist across app restarts
+    flipper_wedge_save_settings(app);  // Save immediately to persist across app restarts
 }
 
-static void hid_device_scene_settings_set_output(VariableItem* item) {
-    HidDevice* app = variable_item_get_context(item);
+static void flipper_wedge_scene_settings_set_output(VariableItem* item) {
+    FlipperWedge* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
     variable_item_set_current_value_text(item, output_text[index]);
-    HidDeviceOutput new_output_mode = (HidDeviceOutput)index;
+    FlipperWedgeOutput new_output_mode = (FlipperWedgeOutput)index;
 
     // Handle output mode change with DEFERRED switching
     if(new_output_mode != app->output_mode) {
         FURI_LOG_I("Settings", "Requesting output mode switch: %s -> %s",
-                   app->output_mode == HidDeviceOutputUsb ? "USB" : "BLE",
-                   new_output_mode == HidDeviceOutputUsb ? "USB" : "BLE");
+                   app->output_mode == FlipperWedgeOutputUsb ? "USB" : "BLE",
+                   new_output_mode == FlipperWedgeOutputUsb ? "USB" : "BLE");
 
         // Set flag for tick callback to process (worker thread handles HID lifecycle)
         app->output_switch_pending = true;
@@ -167,30 +167,30 @@ static void hid_device_scene_settings_set_output(VariableItem* item) {
         // before the async switch completes. The switch function checks the pending
         // flag, not the mode equality, so this is safe.
         app->output_mode = new_output_mode;
-        hid_device_save_settings(app);
+        flipper_wedge_save_settings(app);
 
         // Rebuild settings list to show/hide "Pair Bluetooth..." option
         scene_manager_handle_custom_event(app->scene_manager, SettingsIndexOutput);
     }
 }
 
-static void hid_device_scene_settings_item_callback(void* context, uint32_t index) {
-    HidDevice* app = context;
+static void flipper_wedge_scene_settings_item_callback(void* context, uint32_t index) {
+    FlipperWedge* app = context;
     view_dispatcher_send_custom_event(app->view_dispatcher, index);
 }
 
-void hid_device_scene_settings_on_enter(void* context) {
-    HidDevice* app = context;
+void flipper_wedge_scene_settings_on_enter(void* context) {
+    FlipperWedge* app = context;
     VariableItem* item;
 
     // Keep display backlight on while in settings
     notification_message(app->notification, &sequence_display_backlight_enforce_on);
 
     // CRITICAL: Validate output_mode is within range (fix corrupted settings)
-    if(app->output_mode >= HidDeviceOutputCount) {
+    if(app->output_mode >= FlipperWedgeOutputCount) {
         FURI_LOG_E("Settings", "Output mode %d out of range, forcing to USB", app->output_mode);
-        app->output_mode = HidDeviceOutputUsb;
-        hid_device_save_settings(app);  // Save the fix
+        app->output_mode = FlipperWedgeOutputUsb;
+        flipper_wedge_save_settings(app);  // Save the fix
     }
 
     // Header with branding (non-interactive)
@@ -205,12 +205,12 @@ void hid_device_scene_settings_on_enter(void* context) {
     item = variable_item_list_add(
         app->variable_item_list,
         "Output:",
-        HidDeviceOutputCount,
-        hid_device_scene_settings_set_output,
+        FlipperWedgeOutputCount,
+        flipper_wedge_scene_settings_set_output,
         app);
 
     // Use target mode for display if switching is pending (prevents duplicate positions)
-    HidDeviceOutput display_mode = app->output_switch_pending ?
+    FlipperWedgeOutput display_mode = app->output_switch_pending ?
         app->output_switch_target : app->output_mode;
 
     variable_item_set_current_value_index(item, display_mode);
@@ -218,9 +218,9 @@ void hid_device_scene_settings_on_enter(void* context) {
 
     // Pair Bluetooth... action (show in BLE mode or when switching to BLE)
     // Hide immediately when switching from BLE to USB for cleaner UX
-    bool currently_ble = (app->output_mode == HidDeviceOutputBle);
-    bool switching_to_ble = (app->output_switch_pending && app->output_switch_target == HidDeviceOutputBle);
-    bool switching_from_ble = (app->output_switch_pending && app->output_mode == HidDeviceOutputBle);
+    bool currently_ble = (app->output_mode == FlipperWedgeOutputBle);
+    bool switching_to_ble = (app->output_switch_pending && app->output_switch_target == FlipperWedgeOutputBle);
+    bool switching_from_ble = (app->output_switch_pending && app->output_mode == FlipperWedgeOutputBle);
 
     // Only show if in BLE mode or switching TO BLE (not FROM BLE)
     if((currently_ble || switching_to_ble) && !switching_from_ble) {
@@ -232,7 +232,7 @@ void hid_device_scene_settings_on_enter(void* context) {
             bt_status = "Initializing...";
         } else {
             // Normal BLE mode: Show connection status
-            bool bt_connected = hid_device_hid_is_bt_connected(hid_device_get_hid(app));
+            bool bt_connected = flipper_wedge_hid_is_bt_connected(flipper_wedge_get_hid(app));
             if(bt_connected) {
                 bt_status = "Paired";
             } else {
@@ -257,7 +257,7 @@ void hid_device_scene_settings_on_enter(void* context) {
         app->variable_item_list,
         "Byte Delimiter:",
         DELIMITER_OPTIONS_COUNT,
-        hid_device_scene_settings_set_delimiter,
+        flipper_wedge_scene_settings_set_delimiter,
         app);
     variable_item_set_current_value_index(item, delimiter_index);
     variable_item_set_current_value_text(item, delimiter_names[delimiter_index]);
@@ -267,7 +267,7 @@ void hid_device_scene_settings_on_enter(void* context) {
         app->variable_item_list,
         "Append Enter:",
         2,
-        hid_device_scene_settings_set_append_enter,
+        flipper_wedge_scene_settings_set_append_enter,
         app);
     variable_item_set_current_value_index(item, app->append_enter ? 1 : 0);
     variable_item_set_current_value_text(item, on_off_text[app->append_enter ? 1 : 0]);
@@ -276,8 +276,8 @@ void hid_device_scene_settings_on_enter(void* context) {
     item = variable_item_list_add(
         app->variable_item_list,
         "Start Mode:",
-        HidDeviceModeStartupCount,
-        hid_device_scene_settings_set_mode_startup,
+        FlipperWedgeModeStartupCount,
+        flipper_wedge_scene_settings_set_mode_startup,
         app);
     variable_item_set_current_value_index(item, app->mode_startup_behavior);
     variable_item_set_current_value_text(item, mode_startup_text[app->mode_startup_behavior]);
@@ -286,8 +286,8 @@ void hid_device_scene_settings_on_enter(void* context) {
     item = variable_item_list_add(
         app->variable_item_list,
         "Vibration:",
-        HidDeviceVibrationCount,
-        hid_device_scene_settings_set_vibration,
+        FlipperWedgeVibrationCount,
+        flipper_wedge_scene_settings_set_vibration,
         app);
     variable_item_set_current_value_index(item, app->vibration_level);
     variable_item_set_current_value_text(item, vibration_text[app->vibration_level]);
@@ -296,8 +296,8 @@ void hid_device_scene_settings_on_enter(void* context) {
     item = variable_item_list_add(
         app->variable_item_list,
         "NDEF Max Len:",
-        HidDeviceNdefMaxLenCount,
-        hid_device_scene_settings_set_ndef_max_len,
+        FlipperWedgeNdefMaxLenCount,
+        flipper_wedge_scene_settings_set_ndef_max_len,
         app);
     variable_item_set_current_value_index(item, app->ndef_max_len);
     variable_item_set_current_value_text(item, ndef_max_len_text[app->ndef_max_len]);
@@ -307,7 +307,7 @@ void hid_device_scene_settings_on_enter(void* context) {
         app->variable_item_list,
         "Log to SD:",
         2,
-        hid_device_scene_settings_set_log_to_sd,
+        flipper_wedge_scene_settings_set_log_to_sd,
         app);
     variable_item_set_current_value_index(item, app->log_to_sd ? 1 : 0);
     variable_item_set_current_value_text(item, on_off_text[app->log_to_sd ? 1 : 0]);
@@ -315,25 +315,25 @@ void hid_device_scene_settings_on_enter(void* context) {
     // Set callback for when user clicks on an item
     variable_item_list_set_enter_callback(
         app->variable_item_list,
-        hid_device_scene_settings_item_callback,
+        flipper_wedge_scene_settings_item_callback,
         app);
 
-    view_dispatcher_switch_to_view(app->view_dispatcher, HidDeviceViewIdSettings);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperWedgeViewIdSettings);
 }
 
-bool hid_device_scene_settings_on_event(void* context, SceneManagerEvent event) {
-    HidDevice* app = context;
+bool flipper_wedge_scene_settings_on_event(void* context, SceneManagerEvent event) {
+    FlipperWedge* app = context;
     bool consumed = false;
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == SettingsIndexOutput) {
             // Output mode changed - rebuild list to show/hide Pair BT option
             variable_item_list_reset(app->variable_item_list);
-            hid_device_scene_settings_on_enter(context);
+            flipper_wedge_scene_settings_on_enter(context);
             consumed = true;
         } else if(event.event == SettingsIndexBtPair) {
             // User clicked "Pair Bluetooth..." - navigate to pairing scene
-            scene_manager_next_scene(app->scene_manager, HidDeviceSceneBtPair);
+            scene_manager_next_scene(app->scene_manager, FlipperWedgeSceneBtPair);
             consumed = true;
         }
     } else if(event.type == SceneManagerEventTypeTick) {
@@ -341,7 +341,7 @@ bool hid_device_scene_settings_on_event(void* context, SceneManagerEvent event) 
         static bool last_bt_connected = false;
         static bool last_bt_advertising = false;
         static bool last_switching_pending = false;
-        static HidDeviceOutput last_output_mode = HidDeviceOutputUsb;
+        static FlipperWedgeOutput last_output_mode = FlipperWedgeOutputUsb;
         static uint8_t tick_counter = 0;
 
         // Check more frequently during/after transitions (every 2 ticks = 200ms)
@@ -354,7 +354,7 @@ bool hid_device_scene_settings_on_event(void* context, SceneManagerEvent event) 
         if(tick_counter >= check_interval) {
             tick_counter = 0;
 
-            bool currently_ble = (app->output_mode == HidDeviceOutputBle);
+            bool currently_ble = (app->output_mode == FlipperWedgeOutputBle);
             bool switching = app->output_switch_pending;
 
             // Check if we need to rebuild the list
@@ -376,7 +376,7 @@ bool hid_device_scene_settings_on_event(void* context, SceneManagerEvent event) 
 
             // Check BT status changes when in BLE mode or switching
             if(currently_ble || switching) {
-                bool bt_connected = hid_device_hid_is_bt_connected(hid_device_get_hid(app));
+                bool bt_connected = flipper_wedge_hid_is_bt_connected(flipper_wedge_get_hid(app));
                 bool bt_advertising = furi_hal_bt_is_active();
 
                 if(bt_connected != last_bt_connected || bt_advertising != last_bt_advertising) {
@@ -390,20 +390,20 @@ bool hid_device_scene_settings_on_event(void* context, SceneManagerEvent event) 
             if(needs_rebuild) {
                 FURI_LOG_I("Settings", "Status changed, rebuilding list");
                 variable_item_list_reset(app->variable_item_list);
-                hid_device_scene_settings_on_enter(context);
+                flipper_wedge_scene_settings_on_enter(context);
             }
         }
         consumed = true;
     } else if(event.type == SceneManagerEventTypeBack) {
         // Save settings when leaving
-        hid_device_save_settings(app);
+        flipper_wedge_save_settings(app);
     }
 
     return consumed;
 }
 
-void hid_device_scene_settings_on_exit(void* context) {
-    HidDevice* app = context;
+void flipper_wedge_scene_settings_on_exit(void* context) {
+    FlipperWedge* app = context;
     variable_item_list_set_selected_item(app->variable_item_list, 0);
     variable_item_list_reset(app->variable_item_list);
 

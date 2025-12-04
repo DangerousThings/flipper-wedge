@@ -1,52 +1,52 @@
 #pragma once
 
 #include <gui/view.h>
-#include "../helpers/hid_device_custom_event.h"
+#include "../helpers/flipper_wedge_custom_event.h"
 
 // Forward declaration
-typedef struct HidDeviceStartscreen HidDeviceStartscreen;
+typedef struct FlipperWedgeStartscreen FlipperWedgeStartscreen;
 
 // Scan states for display
 typedef enum {
-    HidDeviceDisplayStateIdle,
-    HidDeviceDisplayStateScanning,
-    HidDeviceDisplayStateWaiting,
-    HidDeviceDisplayStateResult,
-    HidDeviceDisplayStateSent,
-} HidDeviceDisplayState;
+    FlipperWedgeDisplayStateIdle,
+    FlipperWedgeDisplayStateScanning,
+    FlipperWedgeDisplayStateWaiting,
+    FlipperWedgeDisplayStateResult,
+    FlipperWedgeDisplayStateSent,
+} FlipperWedgeDisplayState;
 
-typedef void (*HidDeviceStartscreenCallback)(HidDeviceCustomEvent event, void* context);
+typedef void (*FlipperWedgeStartscreenCallback)(FlipperWedgeCustomEvent event, void* context);
 
-void hid_device_startscreen_set_callback(
-    HidDeviceStartscreen* hid_device_startscreen,
-    HidDeviceStartscreenCallback callback,
+void flipper_wedge_startscreen_set_callback(
+    FlipperWedgeStartscreen* flipper_wedge_startscreen,
+    FlipperWedgeStartscreenCallback callback,
     void* context);
 
-View* hid_device_startscreen_get_view(HidDeviceStartscreen* hid_device_static);
+View* flipper_wedge_startscreen_get_view(FlipperWedgeStartscreen* flipper_wedge_static);
 
-HidDeviceStartscreen* hid_device_startscreen_alloc();
+FlipperWedgeStartscreen* flipper_wedge_startscreen_alloc();
 
-void hid_device_startscreen_free(HidDeviceStartscreen* hid_device_static);
+void flipper_wedge_startscreen_free(FlipperWedgeStartscreen* flipper_wedge_static);
 
-void hid_device_startscreen_set_connected_status(
-    HidDeviceStartscreen* instance,
+void flipper_wedge_startscreen_set_connected_status(
+    FlipperWedgeStartscreen* instance,
     bool usb_connected,
     bool bt_connected);
 
-void hid_device_startscreen_set_mode(
-    HidDeviceStartscreen* instance,
+void flipper_wedge_startscreen_set_mode(
+    FlipperWedgeStartscreen* instance,
     uint8_t mode);
 
-uint8_t hid_device_startscreen_get_mode(HidDeviceStartscreen* instance);
+uint8_t flipper_wedge_startscreen_get_mode(FlipperWedgeStartscreen* instance);
 
-void hid_device_startscreen_set_display_state(
-    HidDeviceStartscreen* instance,
-    HidDeviceDisplayState state);
+void flipper_wedge_startscreen_set_display_state(
+    FlipperWedgeStartscreen* instance,
+    FlipperWedgeDisplayState state);
 
-void hid_device_startscreen_set_status_text(
-    HidDeviceStartscreen* instance,
+void flipper_wedge_startscreen_set_status_text(
+    FlipperWedgeStartscreen* instance,
     const char* text);
 
-void hid_device_startscreen_set_uid_text(
-    HidDeviceStartscreen* instance,
+void flipper_wedge_startscreen_set_uid_text(
+    FlipperWedgeStartscreen* instance,
     const char* text);

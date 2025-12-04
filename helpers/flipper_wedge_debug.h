@@ -3,13 +3,13 @@
 #include <furi.h>
 
 // Debug logging to SD card with automatic log rotation
-// Logs are written to /ext/apps_data/contactless_hid_device/debug.log
+// Logs are written to /ext/apps_data/flipper_wedge/debug.log
 // When log reaches max size, oldest 50% is pruned to keep recent data
 
 /** Initialize debug logging
  * Creates log file if needed, prunes if too large
  */
-void hid_device_debug_init(void);
+void flipper_wedge_debug_init(void);
 
 /** Log a debug message to SD card
  * Thread-safe, includes timestamp and tag
@@ -18,8 +18,8 @@ void hid_device_debug_init(void);
  * @param format Printf-style format string
  * @param ... Format arguments
  */
-void hid_device_debug_log(const char* tag, const char* format, ...);
+void flipper_wedge_debug_log(const char* tag, const char* format, ...);
 
 /** Close debug logging and flush buffers
  */
-void hid_device_debug_close(void);
+void flipper_wedge_debug_close(void);

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Build Contactless HID Device for multiple Flipper Zero firmwares
+# Build Flipper Wedge for multiple Flipper Zero firmwares
 
 set -e  # Exit on error
 
-APP_NAME="contactless_hid_device"
-APP_DIR="/home/work/contactless hid device"
+APP_NAME="flipper_wedge"
+APP_DIR="/home/work/flipper wedge"
 DIST_DIR="${APP_DIR}/dist"
 
 # Default values
@@ -140,7 +140,7 @@ build_for_firmware() {
 }
 
 echo "========================================"
-echo "Building Contactless HID Device"
+echo "Building Flipper Wedge"
 echo "========================================"
 echo ""
 

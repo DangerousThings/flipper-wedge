@@ -1,10 +1,10 @@
-#include "hid_device_speaker.h"
-#include "../hid_device.h"
+#include "flipper_wedge_speaker.h"
+#include "../flipper_wedge.h"
 
 #define NOTE_INPUT 587.33f
 
-void hid_device_play_input_sound(void* context) {
-    HidDevice* app = context;
+void flipper_wedge_play_input_sound(void* context) {
+    FlipperWedge* app = context;
     UNUSED(app);
     float volume = 1.0f;
     if(furi_hal_speaker_is_mine() || furi_hal_speaker_acquire(30)) {
@@ -12,8 +12,8 @@ void hid_device_play_input_sound(void* context) {
     }
 }
 
-void hid_device_stop_all_sound(void* context) {
-    HidDevice* app = context;
+void flipper_wedge_stop_all_sound(void* context) {
+    FlipperWedge* app = context;
     UNUSED(app);
     if(furi_hal_speaker_is_mine()) {
         furi_hal_speaker_stop();

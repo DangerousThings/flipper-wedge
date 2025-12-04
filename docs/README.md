@@ -1,6 +1,6 @@
-# Contactless HID Device - Documentation Index
+# Flipper Wedge - Documentation Index
 
-Welcome to the comprehensive documentation for the Contactless HID Device Flipper Zero application.
+Welcome to the comprehensive documentation for the Flipper Wedge Flipper Zero application.
 
 ---
 
@@ -21,10 +21,11 @@ This project has extensive documentation to support **maintenance, stability, an
 
 **Core Documentation**:
 1. **[CLAUDE.md](../CLAUDE.md)** - Primary maintenance guide (start here!)
-2. **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Fast lookup for common tasks
-3. **[FIRMWARE_COMPATIBILITY.md](FIRMWARE_COMPATIBILITY.md)** - Compatibility matrix & tested versions
-4. **[API_MIGRATION_LOG.md](API_MIGRATION_LOG.md)** - Historical API changes & adaptations
-5. **[TESTING_AUTOMATION.md](TESTING_AUTOMATION.md)** - Testing strategy & automation
+2. **[ARCHITECTURE_PATTERNS.md](ARCHITECTURE_PATTERNS.md)** - Code patterns and critical architecture
+3. **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Fast lookup for common tasks
+4. **[FIRMWARE_COMPATIBILITY.md](FIRMWARE_COMPATIBILITY.md)** - Compatibility matrix & tested versions
+5. **[API_MIGRATION_LOG.md](API_MIGRATION_LOG.md)** - Historical API changes & adaptations
+6. **[TESTING_AUTOMATION.md](TESTING_AUTOMATION.md)** - Testing strategy & automation
 
 **Build & Deploy**:
 - **[BUILD_MULTI_FIRMWARE.md](../BUILD_MULTI_FIRMWARE.md)** - Multi-firmware build instructions
@@ -44,12 +45,13 @@ This project has extensive documentation to support **maintenance, stability, an
 ## Document Structure
 
 ```
-contactless_hid_device/
+flipper_wedge/
 ├── CLAUDE.md                          # 🤖 AI Assistant: Main maintenance guide
 ├── README.md                          # 👤 Users: Installation & usage
 ├── BUILD_MULTI_FIRMWARE.md            # 🔧 Developers: Build instructions
 └── docs/
     ├── README.md                      # 📚 This file (documentation index)
+    ├── ARCHITECTURE_PATTERNS.md       # 🏗️ Code patterns & architecture
     ├── QUICK_REFERENCE.md             # ⚡ Quick lookup & commands
     ├── FIRMWARE_COMPATIBILITY.md      # ✅ Compatibility matrix
     ├── API_MIGRATION_LOG.md           # 📝 API change history
@@ -109,7 +111,7 @@ The project includes three build scripts for multi-firmware support:
 ./build.sh official --tag 1.3.4  # Specific version
 ```
 
-**Output**: `dist/<firmware>/<version>/contactless_hid_device.fap`
+**Output**: `dist/<firmware>/<version>/flipper_wedge.fap`
 
 ### 2. Build and Deploy
 ```bash
@@ -213,4 +215,4 @@ If you encounter issues or have questions:
 
 ---
 
-*This documentation suite is designed to help maintain the Contactless HID Device app across firmware versions and years of development. Keep it updated and it will serve you well.*
+*This documentation suite is designed to help maintain the Flipper Wedge app across firmware versions and years of development. Keep it updated and it will serve you well.*

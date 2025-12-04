@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Contactless HID Device project will be documented in this file.
+All notable changes to the Flipper Wedge project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -61,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Project History
 - **November 2024**: Initial development
   - Project started from flipper-zero-fap-boilerplate template
-  - Renamed from "Contactless HID Reader" to "Contactless HID Device"
+  - Renamed from "Contactless HID Reader" to "Flipper Wedge"
   - Implemented core NFC/RFID reading functionality
   - Added USB and Bluetooth HID output
   - Developed 5-mode scanning system

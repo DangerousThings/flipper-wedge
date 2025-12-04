@@ -1,8 +1,8 @@
-#include "hid_device_format.h"
+#include "flipper_wedge_format.h"
 #include <stdio.h>
 #include <string.h>
 
-void hid_device_format_uid(
+void flipper_wedge_format_uid(
     const uint8_t* uid,
     uint8_t uid_len,
     const char* delimiter,
@@ -36,7 +36,7 @@ void hid_device_format_uid(
     output[pos] = '\0';
 }
 
-void hid_device_format_output(
+void flipper_wedge_format_output(
     const uint8_t* nfc_uid,
     uint8_t nfc_uid_len,
     const uint8_t* rfid_uid,
@@ -59,7 +59,7 @@ void hid_device_format_output(
     if(nfc_first) {
         // NFC UID first
         if(nfc_uid && nfc_uid_len > 0) {
-            hid_device_format_uid(nfc_uid, nfc_uid_len, delimiter, uid_buf, sizeof(uid_buf));
+            flipper_wedge_format_uid(nfc_uid, nfc_uid_len, delimiter, uid_buf, sizeof(uid_buf));
             size_t len = strlen(uid_buf);
             if(pos + len < output_size) {
                 memcpy(output + pos, uid_buf, len);
@@ -78,7 +78,7 @@ void hid_device_format_output(
 
         // Then RFID UID
         if(rfid_uid && rfid_uid_len > 0) {
-            hid_device_format_uid(rfid_uid, rfid_uid_len, delimiter, uid_buf, sizeof(uid_buf));
+            flipper_wedge_format_uid(rfid_uid, rfid_uid_len, delimiter, uid_buf, sizeof(uid_buf));
             size_t len = strlen(uid_buf);
             if(pos + len < output_size) {
                 memcpy(output + pos, uid_buf, len);
@@ -88,7 +88,7 @@ void hid_device_format_output(
     } else {
         // RFID UID first
         if(rfid_uid && rfid_uid_len > 0) {
-            hid_device_format_uid(rfid_uid, rfid_uid_len, delimiter, uid_buf, sizeof(uid_buf));
+            flipper_wedge_format_uid(rfid_uid, rfid_uid_len, delimiter, uid_buf, sizeof(uid_buf));
             size_t len = strlen(uid_buf);
             if(pos + len < output_size) {
                 memcpy(output + pos, uid_buf, len);
@@ -98,7 +98,7 @@ void hid_device_format_output(
 
         // Then NFC UID
         if(nfc_uid && nfc_uid_len > 0) {
-            hid_device_format_uid(nfc_uid, nfc_uid_len, delimiter, uid_buf, sizeof(uid_buf));
+            flipper_wedge_format_uid(nfc_uid, nfc_uid_len, delimiter, uid_buf, sizeof(uid_buf));
             size_t len = strlen(uid_buf);
             if(pos + len < output_size) {
                 memcpy(output + pos, uid_buf, len);
@@ -119,7 +119,7 @@ void hid_device_format_output(
     output[pos] = '\0';
 }
 
-size_t hid_device_sanitize_text(
+size_t flipper_wedge_sanitize_text(
     const char* input,
     char* output,
     size_t output_size,

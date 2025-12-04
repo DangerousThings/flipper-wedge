@@ -23,7 +23,7 @@ Fast lookup guide for common maintenance tasks. Keep this open while working.
 
 # Clean build
 cd /home/work/flipperzero-firmware
-./fbt -c fap_contactless_hid_device
+./fbt -c fap_flipper_wedge
 ```
 
 ### Git Commands
@@ -63,7 +63,7 @@ cd /home/work/unleashed-firmware
 ## File Location Quick Map
 
 ```
-Project Root: /home/work/contactless hid device/
+Project Root: /home/work/flipper wedge/
 
 Core Files:
   hid_device.c/h              Main app entry point
@@ -106,17 +106,17 @@ Build Scripts:
 **Quick Fix**:
 ```bash
 # 1. Check symlink
-ls -l /home/work/flipperzero-firmware/applications_user/contactless_hid_device
+ls -l /home/work/flipperzero-firmware/applications_user/flipper_wedge
 
 # 2. If missing, recreate
-ln -s "/home/work/contactless hid device" /home/work/flipperzero-firmware/applications_user/contactless_hid_device
+ln -s "/home/work/flipper wedge" /home/work/flipperzero-firmware/applications_user/flipper_wedge
 
 # 3. Clean build
 cd /home/work/flipperzero-firmware
-./fbt -c fap_contactless_hid_device
+./fbt -c fap_flipper_wedge
 
 # 4. Retry
-cd "/home/work/contactless hid device"
+cd "/home/work/flipper wedge"
 ./build.sh official
 ```
 
@@ -190,7 +190,7 @@ ls -lh dist/*/
 # Build against latest firmware
 cd /home/work/flipperzero-firmware
 git pull --recurse-submodules
-cd "/home/work/contactless hid device"
+cd "/home/work/flipper wedge"
 ./build.sh official
 
 # Watch for new warnings or errors
@@ -399,7 +399,7 @@ grep "hid_device_storage_" helpers/hid_device_storage.c
 ```bash
 # Check build logs
 cd /home/work/flipperzero-firmware
-./fbt fap_contactless_hid_device 2>&1 | tee build.log
+./fbt fap_flipper_wedge 2>&1 | tee build.log
 
 # Serial logs from Flipper (if connected)
 # Requires: screen or minicom

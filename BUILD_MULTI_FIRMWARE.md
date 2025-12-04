@@ -1,6 +1,6 @@
 # Multi-Firmware Build Guide
 
-This guide shows how to build the Contactless HID Device app for different Flipper Zero firmwares.
+This guide shows how to build the Flipper Wedge app for different Flipper Zero firmwares.
 
 ## Quick Start
 
@@ -63,10 +63,10 @@ I've created three helper scripts for you:
 ```
 
 Output FAP files will be in `dist/` with firmware-specific names:
-- `contactless_hid_device_official.fap`
-- `contactless_hid_device_unleashed.fap`
-- `contactless_hid_device_momentum.fap`
-- `contactless_hid_device_roguemaster.fap`
+- `flipper_wedge_official.fap`
+- `flipper_wedge_unleashed.fap`
+- `flipper_wedge_momentum.fap`
+- `flipper_wedge_roguemaster.fap`
 
 ---
 
@@ -77,19 +77,19 @@ If you prefer to build manually:
 ```bash
 # Official
 cd /home/work/flipperzero-firmware
-./fbt fap_contactless_hid_device
+./fbt fap_flipper_wedge
 
 # Unleashed
 cd /home/work/unleashed-firmware
-./fbt fap_contactless_hid_device
+./fbt fap_flipper_wedge
 
 # Momentum
 cd /home/work/Momentum-Firmware
-./fbt fap_contactless_hid_device
+./fbt fap_flipper_wedge
 
 # RogueMaster
 cd /home/work/roguemaster-firmware
-./fbt fap_contactless_hid_device
+./fbt fap_flipper_wedge
 ```
 
 ---
@@ -98,12 +98,12 @@ cd /home/work/roguemaster-firmware
 
 After building, the FAP file is located at:
 ```
-<firmware-directory>/.fap/contactless_hid_device.fap
+<firmware-directory>/.fap/flipper_wedge.fap
 ```
 
 For example:
-- Official: `/home/work/flipperzero-firmware/.fap/contactless_hid_device.fap`
-- Unleashed: `/home/work/unleashed-firmware/.fap/contactless_hid_device.fap`
+- Official: `/home/work/flipperzero-firmware/.fap/flipper_wedge.fap`
+- Unleashed: `/home/work/unleashed-firmware/.fap/flipper_wedge.fap`
 
 ---
 
@@ -155,12 +155,12 @@ cd /home/work/roguemaster-firmware && git pull --recurse-submodules
 ### Symlink Issues
 If the build script can't find the app, manually create the symlink:
 ```bash
-ln -s "/home/work/contactless hid device" <firmware-path>/applications_user/contactless_hid_device
+ln -s "/home/work/flipper wedge" <firmware-path>/applications_user/flipper_wedge
 ```
 
 ### Build Errors
 - Make sure firmware is up to date
-- Clear build cache: `./fbt -c fap_contactless_hid_device`
+- Clear build cache: `./fbt -c fap_flipper_wedge`
 - Check that submodules are initialized: `git submodule update --init --recursive`
 
 ### FAP Won't Load on Flipper
@@ -180,10 +180,10 @@ When releasing the app:
 
 Example release structure:
 ```
-contactless-hid-device-v1.0/
-├── contactless_hid_device.fap          # Official firmware
-├── contactless_hid_device_unleashed.fap
-├── contactless_hid_device_momentum.fap
+flipper-wedge-v1.0/
+├── flipper_wedge.fap          # Official firmware
+├── flipper_wedge_unleashed.fap
+├── flipper_wedge_momentum.fap
 ├── source/                              # Full source code
 └── BUILD.md                             # Build instructions
 ```
