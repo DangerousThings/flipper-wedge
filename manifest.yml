@@ -8,7 +8,7 @@ version: "1.0"
 category: "Tools"
 
 # Short description (plain text, no markdown)
-short_description: "Read RFID/NFC tags and type UIDs as HID keyboard input via USB or Bluetooth. Supports NDEF text records. Inspirted by the Dangerous Things KBR1"
+short_description: "Read RFID/NFC tags and type UIDs as HID keyboard input via USB or Bluetooth. Supports NDEF text records. Inspired by the Dangerous Things KBR1"
 
 # Full description - references README.md
 description: "@README.md"
