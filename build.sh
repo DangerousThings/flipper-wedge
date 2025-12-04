@@ -1,8 +1,8 @@
 #!/bin/bash
-# Build Contactless HID Device for a specific firmware
+# Build Flipper Wedge for a specific firmware
 
-APP_NAME="contactless_hid_device"
-APP_DIR="/home/work/contactless hid device"
+APP_NAME="flipper_wedge"
+APP_DIR="/home/work/flipper wedge"
 
 # Default values (will be set based on firmware choice)
 FIRMWARE="official"

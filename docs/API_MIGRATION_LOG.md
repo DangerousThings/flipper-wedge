@@ -1,6 +1,6 @@
 # API Migration Log
 
-This document tracks all firmware API changes that affected the Contactless HID Device app and how we adapted to them.
+This document tracks all firmware API changes that affected the Flipper Wedge app and how we adapted to them.
 
 **Purpose**: Maintain a historical record of API changes to help with future migrations and understand the codebase evolution.
 

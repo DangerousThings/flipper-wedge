@@ -8,7 +8,7 @@ version: "1.0"
 category: "Tools"
 
 # Short description (plain text, no markdown)
-short_description: "Read RFID/NFC tags and type UIDs as HID keyboard input via USB or Bluetooth. Supports NDEF text records."
+short_description: "Read RFID/NFC tags and type UIDs as HID keyboard input via USB or Bluetooth. Supports NDEF text records. Inspirted by the Dangerous Things KBR1"
 
 # Full description - references README.md
 description: "@README.md"
@@ -24,8 +24,7 @@ sourcecode:
   type: git
   location:
     origin: https://github.com/DangerousThings/flipper-wedge.git
-    commit_sha: 114c1f897b3b4606123d8b2fc7e34f13811de733
-    # subdir: ""  # Not needed - app is in repo root
+    commit_sha: 43a75108fd2ad50d6817299a87fc21cee0000e5b
 
 # App icon (10x10px 1-bit PNG)
 icon: "icons/flipper_wedge_10px.png"
@@ -34,8 +33,9 @@ icon: "icons/flipper_wedge_10px.png"
 # NOTE: You need to create these screenshots before submission!
 # See instructions below.
 screenshots:
-  - './screenshots/01_main_menu.png'
-  - './screenshots/02_nfc_scanning.png'
-  - './screenshots/03_rfid_scanning.png'
-  - './screenshots/04_ndef_mode.png'
-  - './screenshots/05_settings.png'
+  - './screenshots/01_nfc_scanning.png'
+  - './screenshots/02_rfid_scanning.png'
+  - './screenshots/03_ndef_scanning.png'
+  - './screenshots/04_rfid+nfc.png'
+  - './screenshots/05_nfc+rfid.png'
+  - './screenshots/06_settings.png'

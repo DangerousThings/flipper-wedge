@@ -1,4 +1,4 @@
-#include "../hid_device.h"
+#include "../flipper_wedge.h"
 #include <furi.h>
 #include <furi_hal.h>
 #include <input/input.h>
@@ -14,9 +14,9 @@ static const char* mode_names[] = {
     "RFID -> NFC",
 };
 
-struct HidDeviceStartscreen {
+struct FlipperWedgeStartscreen {
     View* view;
-    HidDeviceStartscreenCallback callback;
+    FlipperWedgeStartscreenCallback callback;
     void* context;
 };
 
@@ -24,14 +24,14 @@ typedef struct {
     bool usb_connected;
     bool bt_connected;
     uint8_t mode;
-    HidDeviceDisplayState display_state;
+    FlipperWedgeDisplayState display_state;
     char status_text[32];
     char uid_text[64];
-} HidDeviceStartscreenModel;
+} FlipperWedgeStartscreenModel;
 
-void hid_device_startscreen_set_callback(
-    HidDeviceStartscreen* instance,
-    HidDeviceStartscreenCallback callback,
+void flipper_wedge_startscreen_set_callback(
+    FlipperWedgeStartscreen* instance,
+    FlipperWedgeStartscreenCallback callback,
     void* context) {
     furi_assert(instance);
     furi_assert(callback);
@@ -39,13 +39,13 @@ void hid_device_startscreen_set_callback(
     instance->context = context;
 }
 
-void hid_device_startscreen_draw(Canvas* canvas, HidDeviceStartscreenModel* model) {
+void flipper_wedge_startscreen_draw(Canvas* canvas, FlipperWedgeStartscreenModel* model) {
     canvas_clear(canvas);
     canvas_set_color(canvas, ColorBlack);
 
     // Title
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str_aligned(canvas, 64, 2, AlignCenter, AlignTop, "Contactless HID");
+    canvas_draw_str_aligned(canvas, 64, 2, AlignCenter, AlignTop, "Flipper Wedge");
 
     // HID connection status
     canvas_set_font(canvas, FontSecondary);
@@ -66,7 +66,7 @@ void hid_device_startscreen_draw(Canvas* canvas, HidDeviceStartscreenModel* mode
     // Mode display with arrows
     canvas_set_font(canvas, FontPrimary);
 
-    if(model->display_state == HidDeviceDisplayStateIdle) {
+    if(model->display_state == FlipperWedgeDisplayStateIdle) {
         // Show mode selector
         const char* mode_name = mode_names[model->mode];
         canvas_draw_str_aligned(canvas, 64, 28, AlignCenter, AlignTop, mode_name);
@@ -85,59 +85,59 @@ void hid_device_startscreen_draw(Canvas* canvas, HidDeviceStartscreenModel* mode
 
         // Show Settings hint
         canvas_draw_str_aligned(canvas, 64, 56, AlignCenter, AlignTop, "[OK] Settings");
-    } else if(model->display_state == HidDeviceDisplayStateScanning) {
+    } else if(model->display_state == FlipperWedgeDisplayStateScanning) {
         // Scanning state
         canvas_draw_str_aligned(canvas, 64, 28, AlignCenter, AlignTop, "Scanning...");
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str_aligned(canvas, 64, 44, AlignCenter, AlignTop, model->status_text);
-    } else if(model->display_state == HidDeviceDisplayStateWaiting) {
+    } else if(model->display_state == FlipperWedgeDisplayStateWaiting) {
         // Waiting for second tag
         canvas_draw_str_aligned(canvas, 64, 28, AlignCenter, AlignTop, "Waiting...");
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str_aligned(canvas, 64, 44, AlignCenter, AlignTop, model->status_text);
-    } else if(model->display_state == HidDeviceDisplayStateResult) {
+    } else if(model->display_state == FlipperWedgeDisplayStateResult) {
         // Show scanned UID
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str_aligned(canvas, 64, 28, AlignCenter, AlignTop, model->uid_text);
         canvas_draw_str_aligned(canvas, 64, 44, AlignCenter, AlignTop, model->status_text);
-    } else if(model->display_state == HidDeviceDisplayStateSent) {
+    } else if(model->display_state == FlipperWedgeDisplayStateSent) {
         // Show "Sent"
         canvas_draw_str_aligned(canvas, 64, 36, AlignCenter, AlignCenter, "Sent");
     }
 }
 
-static void hid_device_startscreen_model_init(HidDeviceStartscreenModel* const model) {
+static void flipper_wedge_startscreen_model_init(FlipperWedgeStartscreenModel* const model) {
     model->usb_connected = false;
     model->bt_connected = false;
-    model->mode = HidDeviceModeNfc;
-    model->display_state = HidDeviceDisplayStateIdle;
+    model->mode = FlipperWedgeModeNfc;
+    model->display_state = FlipperWedgeDisplayStateIdle;
     model->status_text[0] = '\0';
     model->uid_text[0] = '\0';
 }
 
-bool hid_device_startscreen_input(InputEvent* event, void* context) {
+bool flipper_wedge_startscreen_input(InputEvent* event, void* context) {
     furi_assert(context);
-    HidDeviceStartscreen* instance = context;
+    FlipperWedgeStartscreen* instance = context;
 
     if(event->type == InputTypeRelease || event->type == InputTypeRepeat) {
         switch(event->key) {
         case InputKeyBack:
             if(event->type == InputTypeRelease) {
-                instance->callback(HidDeviceCustomEventStartscreenBack, instance->context);
+                instance->callback(FlipperWedgeCustomEventStartscreenBack, instance->context);
             }
             break;
         case InputKeyLeft:
             with_view_model(
                 instance->view,
-                HidDeviceStartscreenModel * model,
+                FlipperWedgeStartscreenModel * model,
                 {
-                    if(model->display_state == HidDeviceDisplayStateIdle) {
+                    if(model->display_state == FlipperWedgeDisplayStateIdle) {
                         if(model->mode == 0) {
                             model->mode = MODE_COUNT - 1;
                         } else {
                             model->mode--;
                         }
-                        instance->callback(HidDeviceCustomEventModeChange, instance->context);
+                        instance->callback(FlipperWedgeCustomEventModeChange, instance->context);
                     }
                 },
                 true);
@@ -145,11 +145,11 @@ bool hid_device_startscreen_input(InputEvent* event, void* context) {
         case InputKeyRight:
             with_view_model(
                 instance->view,
-                HidDeviceStartscreenModel * model,
+                FlipperWedgeStartscreenModel * model,
                 {
-                    if(model->display_state == HidDeviceDisplayStateIdle) {
+                    if(model->display_state == FlipperWedgeDisplayStateIdle) {
                         model->mode = (model->mode + 1) % MODE_COUNT;
-                        instance->callback(HidDeviceCustomEventModeChange, instance->context);
+                        instance->callback(FlipperWedgeCustomEventModeChange, instance->context);
                     }
                 },
                 true);
@@ -157,7 +157,7 @@ bool hid_device_startscreen_input(InputEvent* event, void* context) {
         case InputKeyOk:
             if(event->type == InputTypeRelease) {
                 // Open Settings
-                instance->callback(HidDeviceCustomEventOpenSettings, instance->context);
+                instance->callback(FlipperWedgeCustomEventOpenSettings, instance->context);
             }
             break;
         case InputKeyUp:
@@ -169,59 +169,59 @@ bool hid_device_startscreen_input(InputEvent* event, void* context) {
     return true;
 }
 
-void hid_device_startscreen_exit(void* context) {
+void flipper_wedge_startscreen_exit(void* context) {
     furi_assert(context);
 }
 
-void hid_device_startscreen_enter(void* context) {
+void flipper_wedge_startscreen_enter(void* context) {
     furi_assert(context);
-    HidDeviceStartscreen* instance = (HidDeviceStartscreen*)context;
+    FlipperWedgeStartscreen* instance = (FlipperWedgeStartscreen*)context;
     UNUSED(instance);
     // Model is initialized during allocation and updated via setters
     // Don't reset state when view becomes active
 }
 
-HidDeviceStartscreen* hid_device_startscreen_alloc() {
-    HidDeviceStartscreen* instance = malloc(sizeof(HidDeviceStartscreen));
+FlipperWedgeStartscreen* flipper_wedge_startscreen_alloc() {
+    FlipperWedgeStartscreen* instance = malloc(sizeof(FlipperWedgeStartscreen));
     instance->view = view_alloc();
-    view_allocate_model(instance->view, ViewModelTypeLocking, sizeof(HidDeviceStartscreenModel));
+    view_allocate_model(instance->view, ViewModelTypeLocking, sizeof(FlipperWedgeStartscreenModel));
     view_set_context(instance->view, instance);
-    view_set_draw_callback(instance->view, (ViewDrawCallback)hid_device_startscreen_draw);
-    view_set_input_callback(instance->view, hid_device_startscreen_input);
-    view_set_enter_callback(instance->view, hid_device_startscreen_enter);
-    view_set_exit_callback(instance->view, hid_device_startscreen_exit);
+    view_set_draw_callback(instance->view, (ViewDrawCallback)flipper_wedge_startscreen_draw);
+    view_set_input_callback(instance->view, flipper_wedge_startscreen_input);
+    view_set_enter_callback(instance->view, flipper_wedge_startscreen_enter);
+    view_set_exit_callback(instance->view, flipper_wedge_startscreen_exit);
 
     with_view_model(
         instance->view,
-        HidDeviceStartscreenModel * model,
-        { hid_device_startscreen_model_init(model); },
+        FlipperWedgeStartscreenModel * model,
+        { flipper_wedge_startscreen_model_init(model); },
         true);
 
     return instance;
 }
 
-void hid_device_startscreen_free(HidDeviceStartscreen* instance) {
+void flipper_wedge_startscreen_free(FlipperWedgeStartscreen* instance) {
     furi_assert(instance);
 
     with_view_model(
-        instance->view, HidDeviceStartscreenModel * model, { UNUSED(model); }, true);
+        instance->view, FlipperWedgeStartscreenModel * model, { UNUSED(model); }, true);
     view_free(instance->view);
     free(instance);
 }
 
-View* hid_device_startscreen_get_view(HidDeviceStartscreen* instance) {
+View* flipper_wedge_startscreen_get_view(FlipperWedgeStartscreen* instance) {
     furi_assert(instance);
     return instance->view;
 }
 
-void hid_device_startscreen_set_connected_status(
-    HidDeviceStartscreen* instance,
+void flipper_wedge_startscreen_set_connected_status(
+    FlipperWedgeStartscreen* instance,
     bool usb_connected,
     bool bt_connected) {
     furi_assert(instance);
     with_view_model(
         instance->view,
-        HidDeviceStartscreenModel * model,
+        FlipperWedgeStartscreenModel * model,
         {
             model->usb_connected = usb_connected;
             model->bt_connected = bt_connected;
@@ -229,25 +229,25 @@ void hid_device_startscreen_set_connected_status(
         true);
 }
 
-void hid_device_startscreen_set_mode(
-    HidDeviceStartscreen* instance,
+void flipper_wedge_startscreen_set_mode(
+    FlipperWedgeStartscreen* instance,
     uint8_t mode) {
     furi_assert(instance);
     with_view_model(
         instance->view,
-        HidDeviceStartscreenModel * model,
+        FlipperWedgeStartscreenModel * model,
         {
             model->mode = mode;
         },
         true);
 }
 
-uint8_t hid_device_startscreen_get_mode(HidDeviceStartscreen* instance) {
+uint8_t flipper_wedge_startscreen_get_mode(FlipperWedgeStartscreen* instance) {
     furi_assert(instance);
     uint8_t mode = 0;
     with_view_model(
         instance->view,
-        HidDeviceStartscreenModel * model,
+        FlipperWedgeStartscreenModel * model,
         {
             mode = model->mode;
         },
@@ -255,26 +255,26 @@ uint8_t hid_device_startscreen_get_mode(HidDeviceStartscreen* instance) {
     return mode;
 }
 
-void hid_device_startscreen_set_display_state(
-    HidDeviceStartscreen* instance,
-    HidDeviceDisplayState state) {
+void flipper_wedge_startscreen_set_display_state(
+    FlipperWedgeStartscreen* instance,
+    FlipperWedgeDisplayState state) {
     furi_assert(instance);
     with_view_model(
         instance->view,
-        HidDeviceStartscreenModel * model,
+        FlipperWedgeStartscreenModel * model,
         {
             model->display_state = state;
         },
         true);
 }
 
-void hid_device_startscreen_set_status_text(
-    HidDeviceStartscreen* instance,
+void flipper_wedge_startscreen_set_status_text(
+    FlipperWedgeStartscreen* instance,
     const char* text) {
     furi_assert(instance);
     with_view_model(
         instance->view,
-        HidDeviceStartscreenModel * model,
+        FlipperWedgeStartscreenModel * model,
         {
             if(text) {
                 snprintf(model->status_text, sizeof(model->status_text), "%s", text);
@@ -285,13 +285,13 @@ void hid_device_startscreen_set_status_text(
         true);
 }
 
-void hid_device_startscreen_set_uid_text(
-    HidDeviceStartscreen* instance,
+void flipper_wedge_startscreen_set_uid_text(
+    FlipperWedgeStartscreen* instance,
     const char* text) {
     furi_assert(instance);
     with_view_model(
         instance->view,
-        HidDeviceStartscreenModel * model,
+        FlipperWedgeStartscreenModel * model,
         {
             if(text) {
                 snprintf(model->uid_text, sizeof(model->uid_text), "%s", text);

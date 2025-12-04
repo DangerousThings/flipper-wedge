@@ -1,4 +1,4 @@
-#include "hid_device_debug.h"
+#include "flipper_wedge_debug.h"
 #include <storage/storage.h>
 #include <stdarg.h>
 
@@ -55,7 +55,7 @@ static void debug_rotate_log(void) {
     free(buffer);
 }
 
-void hid_device_debug_init(void) {
+void flipper_wedge_debug_init(void) {
     // Allocate mutex for thread-safe logging
     if(!debug_mutex) {
         debug_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
@@ -88,7 +88,7 @@ void hid_device_debug_init(void) {
     furi_mutex_release(debug_mutex);
 }
 
-void hid_device_debug_log(const char* tag, const char* format, ...) {
+void flipper_wedge_debug_log(const char* tag, const char* format, ...) {
     if(!debug_file || !debug_storage || !debug_mutex) {
         return;  // Not initialized
     }
@@ -130,7 +130,7 @@ void hid_device_debug_log(const char* tag, const char* format, ...) {
     furi_mutex_release(debug_mutex);
 }
 
-void hid_device_debug_close(void) {
+void flipper_wedge_debug_close(void) {
     if(!debug_mutex) return;
 
     furi_mutex_acquire(debug_mutex, FuriWaitForever);

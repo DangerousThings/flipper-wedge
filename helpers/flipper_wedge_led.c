@@ -1,8 +1,8 @@
-#include "hid_device_led.h"
-#include "../hid_device.h"
+#include "flipper_wedge_led.h"
+#include "../flipper_wedge.h"
 
-void hid_device_led_set_rgb(void* context, int red, int green, int blue) {
-    HidDevice* app = context;
+void flipper_wedge_led_set_rgb(void* context, int red, int green, int blue) {
+    FlipperWedge* app = context;
     NotificationMessage notification_led_message_1;
     notification_led_message_1.type = NotificationMessageTypeLedRed;
     NotificationMessage notification_led_message_2;
@@ -25,8 +25,8 @@ void hid_device_led_set_rgb(void* context, int red, int green, int blue) {
         0, FuriFlagWaitAny, 10); //Delay, prevent removal from RAM before LED value set
 }
 
-void hid_device_led_reset(void* context) {
-    HidDevice* app = context;
+void flipper_wedge_led_reset(void* context) {
+    FlipperWedge* app = context;
     notification_message(app->notification, &sequence_reset_red);
     notification_message(app->notification, &sequence_reset_green);
     notification_message(app->notification, &sequence_reset_blue);

@@ -1,4 +1,4 @@
-# Contactless HID Device
+# Flipper Wedge
 ### Brought to you by Dangerous Things
 
 A Flipper Zero application that transforms your device into a contactless tag-to-keyboard interface. Read RFID and NFC tags, then automatically type their UIDs and NDEF data as HID keyboard input via USB or Bluetooth.
@@ -50,13 +50,13 @@ A Flipper Zero application that transforms your device into a contactless tag-to
 ### From Flipper App Store (Recommended)
 1. Open Flipper Mobile App
 2. Navigate to **Apps** → **Categories** → **Tools**
-3. Find **Contactless HID Device**
+3. Find **Flipper Wedge**
 4. Tap **Install**
 
 ### Manual Installation
 1. Download the latest `.fap` file from [Releases](../../releases)
 2. Copy to `SD Card/apps/Tools/` on your Flipper Zero
-3. Navigate to **Apps** → **Tools** → **Contactless HID Device** on your Flipper
+3. Navigate to **Apps** → **Tools** → **Flipper Wedge** on your Flipper
 
 ### Build from Source
 See [Building from Source](#building-from-source) below.
@@ -64,7 +64,7 @@ See [Building from Source](#building-from-source) below.
 ## Usage
 
 ### Quick Start
-1. Launch **Contactless HID Device** from Apps → Tools
+1. Launch **Flipper Wedge** from Apps → Tools
 2. Select your scanning mode from the menu
 3. Connect via USB to a computer, or pair via Bluetooth
 4. Present a tag to the Flipper Zero
@@ -152,33 +152,33 @@ git clone --recursive https://github.com/flipperdevices/flipperzero-firmware.git
 cd flipperzero-firmware
 
 # Clone this app into applications_user
-git clone https://github.com/dangerousthings/contactless-hid-device.git applications_user/contactless_hid_device
+git clone https://github.com/DangerousThings/flipper-wedge.git applications_user/flipper_wedge
 
 # Build the app
-./fbt fap_contactless_hid_device
+./fbt fap_flipper_wedge
 ```
 
 ### Deploy to Flipper
 ```bash
 # Build and launch on connected Flipper via USB
-./fbt launch APPSRC=applications_user/contactless_hid_device
+./fbt launch APPSRC=applications_user/flipper_wedge
 
 # Or manually copy the FAP file
-# Output: build/f7-firmware-D/.extapps/contactless_hid_device.fap
+# Output: build/f7-firmware-D/.extapps/flipper_wedge.fap
 # Copy to: SD Card/apps/Tools/
 ```
 
 ### Build with Docker (Alternative)
 ```bash
 # If you prefer Docker-based builds
-./fbt fap_contactless_hid_device COMPACT=1 DEBUG=0
+./fbt fap_flipper_wedge COMPACT=1 DEBUG=0
 ```
 
 ## Development
 
 ### Project Structure
 ```
-contactless_hid_device/
+flipper_wedge/
 ├── application.fam          # App manifest
 ├── hid_device.c/h          # Main app entry point
 ├── helpers/                # Core modules

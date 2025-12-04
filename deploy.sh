@@ -1,8 +1,8 @@
 #!/bin/bash
-# Build and deploy Contactless HID Device to connected Flipper
+# Build and deploy Flipper Wedge to connected Flipper
 
-APP_NAME="contactless_hid_device"
-APP_DIR="/home/work/contactless hid device"
+APP_NAME="flipper_wedge"
+APP_DIR="/home/work/flipper wedge"
 
 # Default values (will be set based on firmware choice)
 FIRMWARE="official"

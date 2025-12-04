@@ -1,21 +1,21 @@
-#include "hid_device_haptic.h"
-#include "../hid_device.h"
+#include "flipper_wedge_haptic.h"
+#include "../flipper_wedge.h"
 
-void hid_device_play_happy_bump(void* context) {
-    HidDevice* app = context;
+void flipper_wedge_play_happy_bump(void* context) {
+    FlipperWedge* app = context;
 
     // Get vibration duration based on setting
     uint32_t duration_ms;
     switch(app->vibration_level) {
-        case HidDeviceVibrationOff:
+        case FlipperWedgeVibrationOff:
             return;  // No vibration
-        case HidDeviceVibrationLow:
+        case FlipperWedgeVibrationLow:
             duration_ms = 30;
             break;
-        case HidDeviceVibrationMedium:
+        case FlipperWedgeVibrationMedium:
             duration_ms = 60;
             break;
-        case HidDeviceVibrationHigh:
+        case FlipperWedgeVibrationHigh:
             duration_ms = 100;
             break;
         default:
@@ -28,15 +28,15 @@ void hid_device_play_happy_bump(void* context) {
     notification_message(app->notification, &sequence_reset_vibro);
 }
 
-void hid_device_play_bad_bump(void* context) {
-    HidDevice* app = context;
+void flipper_wedge_play_bad_bump(void* context) {
+    FlipperWedge* app = context;
     notification_message(app->notification, &sequence_set_vibro_on);
     furi_thread_flags_wait(0, FuriFlagWaitAny, 100);
     notification_message(app->notification, &sequence_reset_vibro);
 }
 
-void hid_device_play_long_bump(void* context) {
-    HidDevice* app = context;
+void flipper_wedge_play_long_bump(void* context) {
+    FlipperWedge* app = context;
     for(int i = 0; i < 4; i++) {
         notification_message(app->notification, &sequence_set_vibro_on);
         furi_thread_flags_wait(0, FuriFlagWaitAny, 50);

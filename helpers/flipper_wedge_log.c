@@ -1,4 +1,4 @@
-#include "hid_device_log.h"
+#include "flipper_wedge_log.h"
 #include <storage/storage.h>
 #include <furi_hal_rtc.h>
 
@@ -53,7 +53,7 @@ static void log_rotate(Storage* storage) {
     free(buffer);
 }
 
-void hid_device_log_scan(const char* data) {
+void flipper_wedge_log_scan(const char* data) {
     if(!data) return;
 
     // Allocate mutex on first use

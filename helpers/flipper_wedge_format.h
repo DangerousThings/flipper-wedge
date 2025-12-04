@@ -2,7 +2,7 @@
 
 #include <furi.h>
 
-#define HID_DEVICE_FORMAT_MAX_LEN 128
+#define FLIPPER_WEDGE_FORMAT_MAX_LEN 128
 
 /** Format UID bytes to hex string with delimiter
  *
@@ -12,7 +12,7 @@
  * @param output Output buffer
  * @param output_size Size of output buffer
  */
-void hid_device_format_uid(
+void flipper_wedge_format_uid(
     const uint8_t* uid,
     uint8_t uid_len,
     const char* delimiter,
@@ -31,7 +31,7 @@ void hid_device_format_uid(
  * @param output Output buffer
  * @param output_size Size of output buffer
  */
-void hid_device_format_output(
+void flipper_wedge_format_output(
     const uint8_t* nfc_uid,
     uint8_t nfc_uid_len,
     const uint8_t* rfid_uid,
@@ -51,7 +51,7 @@ void hid_device_format_output(
  * @param max_len Maximum characters to keep (0 = no limit)
  * @return Number of characters in sanitized output
  */
-size_t hid_device_sanitize_text(
+size_t flipper_wedge_sanitize_text(
     const char* input,
     char* output,
     size_t output_size,

@@ -1,9 +1,9 @@
 App(
-    appid="contactless_hid_device",
-    name="Contactless HID Device",
+    appid="flipper_wedge",
+    name="Flipper Wedge",
     apptype=FlipperAppType.EXTERNAL,
-    entry_point="hid_device_app",
-    cdefines=["APP_HID_DEVICE"],
+    entry_point="flipper_wedge_app",
+    cdefines=["APP_FLIPPER_WEDGE"],
     requires=[
         "gui",
         "storage",
@@ -14,11 +14,11 @@ App(
     stack_size=4 * 1024,
     order=10,
     fap_libs=["ble_profile"],
-    fap_icon="icons/hid_device_10px.png",
+    fap_icon="icons/flipper_wedge_10px.png",
     fap_icon_assets="icons",
     fap_category="Tools",
     fap_version="1.0",
     fap_description="Read RFID/NFC tags and type their UIDs as HID keyboard input via USB or Bluetooth. Supports 5 scan modes and NDEF text records.",
-    fap_author="Contactless HID Device Contributors",
-    fap_weburl="https://github.com/dangerousthings/contactless-hid-device",
+    fap_author="Dangerous Things",
+    fap_weburl="https://github.com/DangerousThings/flipper-wedge",
 )

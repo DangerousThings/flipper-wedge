@@ -1,6 +1,6 @@
 # Firmware Compatibility Matrix
 
-This document tracks tested firmware versions, compatibility status, and known issues for each release of Contactless HID Device.
+This document tracks tested firmware versions, compatibility status, and known issues for each release of Flipper Wedge.
 
 ---
 
