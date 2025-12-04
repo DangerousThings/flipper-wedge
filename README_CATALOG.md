@@ -166,6 +166,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - **Discussions:** [GitHub Discussions](https://github.com/DangerousThings/flipper-wedge/discussions)
 - **Flipper Zero Community:** [Official Forum](https://forum.flipper.net/)
 
----
-
 **Disclaimer:** This tool is for authorized use only. Always ensure you have permission to read tags and input data on target systems. The developers are not responsible for misuse of this application.
