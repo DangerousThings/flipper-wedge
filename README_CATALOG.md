@@ -4,10 +4,6 @@
 
 A Flipper Zero application that transforms your device into a contactless tag-to-keyboard interface. Read RFID and NFC tags, then automatically type their UIDs and NDEF data as HID keyboard input via USB or Bluetooth.
 
-![Category: Tools](https://img.shields.io/badge/Category-Tools-blue)
-![Version](https://img.shields.io/badge/Version-1.0-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
-
 ## Features
 
 **Tag Reading**
