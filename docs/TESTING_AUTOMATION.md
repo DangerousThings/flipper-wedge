@@ -242,7 +242,7 @@ int run_tests(void) {
 **Run tests**:
 ```bash
 cd /home/work/flipperzero-firmware
-./fbt test_contactless_hid_device
+./fbt test_flipper_wedge
 ```
 
 ---
@@ -434,23 +434,23 @@ jobs:
       - name: Clone Official Firmware
         run: |
           git clone --recursive https://github.com/flipperdevices/flipperzero-firmware.git
-          ln -s "$PWD" flipperzero-firmware/applications_user/contactless_hid_device
+          ln -s "$PWD" flipperzero-firmware/applications_user/flipper_wedge
 
       - name: Build FAP
         run: |
           cd flipperzero-firmware
-          ./fbt fap_contactless_hid_device
+          ./fbt fap_flipper_wedge
 
       - name: Check for warnings
         run: |
           cd flipperzero-firmware
-          ! ./fbt fap_contactless_hid_device 2>&1 | grep -i "warning:"
+          ! ./fbt fap_flipper_wedge 2>&1 | grep -i "warning:"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: contactless_hid_device-official.fap
-          path: flipperzero-firmware/build/*/. extapps/contactless_hid_device.fap
+          name: flipper_wedge-official.fap
+          path: flipperzero-firmware/build/*/. extapps/flipper_wedge.fap
 
   build-unleashed:
     runs-on: ubuntu-latest
@@ -547,7 +547,7 @@ Create `scripts/test-checklist.sh`:
 CHECKLIST_FILE="test-results-$(date +%Y%m%d-%H%M%S).txt"
 
 echo "=========================================" | tee $CHECKLIST_FILE
-echo "Contactless HID Device - Test Checklist" | tee -a $CHECKLIST_FILE
+echo "Flipper Wedge - Test Checklist" | tee -a $CHECKLIST_FILE
 echo "=========================================" | tee -a $CHECKLIST_FILE
 echo "" | tee -a $CHECKLIST_FILE
 
@@ -621,7 +621,7 @@ git commit -m "..."
 
 # Run unit tests (once implemented)
 cd /home/work/flipperzero-firmware
-./fbt test_contactless_hid_device
+./fbt test_flipper_wedge
 ```
 
 **Before Release** (manual):

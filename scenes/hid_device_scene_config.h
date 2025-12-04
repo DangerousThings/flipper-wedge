@@ -1,6 +1,0 @@
-ADD_SCENE(hid_device, startscreen, Startscreen)
-ADD_SCENE(hid_device, menu, Menu)
-ADD_SCENE(hid_device, settings, Settings)
-ADD_SCENE(hid_device, bt_pair, BtPair)
-// Deprecated: usb_debug_restart scene no longer needed (dynamic switching works without restart)
-// ADD_SCENE(hid_device, usb_debug_restart, UsbDebugRestart)
