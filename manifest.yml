@@ -24,7 +24,7 @@ sourcecode:
   type: git
   location:
     origin: https://github.com/DangerousThings/flipper-wedge.git
-    commit_sha: c4548c7b63e2fcdd22fc83cdf0802ea39ca49f0e
+    commit_sha: 8f0b8e70b90f19a1c12014149e0ca63d458fa4f5
 
 # App icon (10x10px 1-bit PNG)
 icon: "icons/flipper_wedge_10px.png"
