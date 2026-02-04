@@ -132,6 +132,22 @@ void flipper_wedge_read_settings(void* context) {
     Storage* storage = flipper_wedge_open_storage();
     FlipperFormat* fff_file = flipper_format_file_alloc(storage);
 
+    // Migrate old settings file from hid_device path if it exists and new one doesn't
+    if(storage_common_stat(storage, FLIPPER_WEDGE_SETTINGS_SAVE_PATH_OLD, NULL) == FSE_OK &&
+       storage_common_stat(storage, FLIPPER_WEDGE_SETTINGS_SAVE_PATH, NULL) != FSE_OK) {
+        FURI_LOG_I(TAG, "Migrating settings from old path");
+        // Ensure new directory exists
+        if(storage_common_stat(storage, CONFIG_FILE_DIRECTORY_PATH, NULL) == FSE_NOT_EXIST) {
+            storage_simply_mkdir(storage, CONFIG_FILE_DIRECTORY_PATH);
+        }
+        // Copy old file to new location
+        if(storage_common_copy(storage, FLIPPER_WEDGE_SETTINGS_SAVE_PATH_OLD, FLIPPER_WEDGE_SETTINGS_SAVE_PATH) == FSE_OK) {
+            FURI_LOG_I(TAG, "Settings migrated successfully");
+        } else {
+            FURI_LOG_E(TAG, "Failed to migrate settings");
+        }
+    }
+
     if(storage_common_stat(storage, FLIPPER_WEDGE_SETTINGS_SAVE_PATH, NULL) != FSE_OK) {
         flipper_wedge_close_config_file(fff_file);
         flipper_wedge_close_storage();

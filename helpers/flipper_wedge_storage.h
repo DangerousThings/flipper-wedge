@@ -7,9 +7,13 @@
 #include "../flipper_wedge.h"
 
 #define FLIPPER_WEDGE_SETTINGS_FILE_VERSION 6
-#define CONFIG_FILE_DIRECTORY_PATH EXT_PATH("apps_data/hid_device")
-#define FLIPPER_WEDGE_SETTINGS_SAVE_PATH CONFIG_FILE_DIRECTORY_PATH "/hid_device.conf"
+#define CONFIG_FILE_DIRECTORY_PATH EXT_PATH("apps_data/flipper_wedge")
+#define FLIPPER_WEDGE_SETTINGS_SAVE_PATH CONFIG_FILE_DIRECTORY_PATH "/flipper_wedge.conf"
 #define FLIPPER_WEDGE_SETTINGS_SAVE_PATH_TMP FLIPPER_WEDGE_SETTINGS_SAVE_PATH ".tmp"
+
+// Old paths for migration from hid_device naming
+#define CONFIG_FILE_DIRECTORY_PATH_OLD EXT_PATH("apps_data/hid_device")
+#define FLIPPER_WEDGE_SETTINGS_SAVE_PATH_OLD CONFIG_FILE_DIRECTORY_PATH_OLD "/hid_device.conf"
 #define FLIPPER_WEDGE_SETTINGS_HEADER "FlipperWedge Config File"
 #define FLIPPER_WEDGE_SETTINGS_KEY_DELIMITER "Delimiter"
 #define FLIPPER_WEDGE_SETTINGS_KEY_APPEND_ENTER "AppendEnter"

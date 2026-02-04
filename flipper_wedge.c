@@ -1,5 +1,6 @@
 #include "flipper_wedge.h"
 #include "helpers/flipper_wedge_debug.h"
+#include "helpers/flipper_wedge_log.h"
 
 bool flipper_wedge_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
@@ -278,6 +279,9 @@ void flipper_wedge_app_free(FlipperWedge* app) {
     // Close debug logging
     flipper_wedge_debug_log("App", "=== APP EXITING ===");
     flipper_wedge_debug_close();
+
+    // Close scan logging (free mutex)
+    flipper_wedge_log_close();
 
     //Remove whatever is left
     free(app);

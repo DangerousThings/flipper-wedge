@@ -146,15 +146,9 @@ void flipper_wedge_hid_init_ble(FlipperWedgeHid* instance) {
     furi_delay_ms(200);
     flipper_wedge_debug_log(TAG, "NVM sync complete");
 
-    // Set up key storage
+    // Set up key storage path
     flipper_wedge_debug_log(TAG, "Setting up BT key storage");
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-    storage_common_migrate(
-        storage,
-        EXT_PATH("apps/NFC/" FLIPPER_WEDGE_BT_KEYS_STORAGE_NAME),
-        APP_DATA_PATH(FLIPPER_WEDGE_BT_KEYS_STORAGE_NAME));
     bt_keys_storage_set_storage_path(instance->bt, APP_DATA_PATH(FLIPPER_WEDGE_BT_KEYS_STORAGE_NAME));
-    furi_record_close(RECORD_STORAGE);
     flipper_wedge_debug_log(TAG, "BT key storage configured");
 
     // Start BLE HID profile with "HID" prefix (max 8 chars)
