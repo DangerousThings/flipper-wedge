@@ -35,7 +35,7 @@ icon: "icons/flipper_wedge_10px.png"
 screenshots:
   - './screenshots/01_nfc_scanning.png'
   - './screenshots/02_rfid_scanning.png'
-  - './screenshots/03_ndef_scanning.png'
+  - './screenshots/03_ndef_mode.png'
   - './screenshots/04_rfid+nfc.png'
   - './screenshots/05_nfc+rfid.png'
   - './screenshots/06_settings.png'
